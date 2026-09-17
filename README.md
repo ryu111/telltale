@@ -22,14 +22,14 @@ either way:
 ```bash
 export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1
 
-# from a marketplace
-claude plugin install telltale
-
-# or straight from a checkout, for development
+# straight from a checkout (no marketplace listing yet)
+git clone https://github.com/ryu111/telltale
 claude --plugin-dir /path/to/telltale
+
+# or drop it into ~/.claude/skills/telltale/ — it auto-loads next session as telltale@skills-dir
 ```
 
-When both are present for the same plugin name, `--plugin-dir` wins.
+When both are present for the same plugin name, `--plugin-dir` wins. Tested on Claude Code 2.1.267; the function-hooks API is early access and may change.
 
 ## `/telltale`
 
