@@ -81,3 +81,8 @@ export const onRow = (hit: string, cells: Record<string, Cell>, now: number): On
 
 - `Cell.collapsed?: true` 是本票新加的欄位，`panel.ts` 不在本票原始可碰清單裡（票 13 也沒加），本票視為必要延伸做了，請主 agent 核對票 13／10／14／15 有沒有同時在動 `Cell` 型別、避免定義衝突。
 - `command.ts` 的 `agents size` 與 `onRow`／點擊（票 11）寫同一個 `size.agents` 鍵；本票只測 command 這邊字面值正確，兩邊字面值是否真的一致（沒有各自手誤成 `"Full"`／`"full "`）建議在票 11 或本票收尾時各加一個交叉測試，目前分散在兩張票各自的測試檔裡、沒有一個地方同時看兩邊。
+
+## 票 16 實測留給本票的接線（必做，不然 agents 面板永遠是 `agents · 0 cells`）
+1. `panels/agents.ts` 的 `view()` 目前是 placeholder，要改成回 `{ kind: "cells", cells }`（SDD §1.1a）。
+2. `register.tsx` 的 `buildBandProps` 對一般面板讀 `data.<id>`，但 agents 的資料在 `agents.cells`：要讓 agents 面板的 `view` 收到 `agents.cells`（或統一鍵名），並把 cells 放進 `BandPanel` 交給 band.tsx（band.tsx 的 `cellsOf()` 已經會吃）。
+3. 接好後**重跑票 16 的 tmux 驗收第 1 項**：真的派一個 subagent（Explore、haiku），capture 要看到 agents 面板長出 main 與 sub 兩個 cell、節點隨事件出現；把 capture 與 log 行補進 `docs/實測/agents.md` 的「item 1（真資料）」一節。可碰檔案因此加：`plugins/telltale/hooks/register.tsx`（已在）、`docs/實測/agents.md`。
