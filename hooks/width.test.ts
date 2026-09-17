@@ -67,3 +67,14 @@ test("fit output always satisfies displayWidth <= columns", () => {
     }
   }
 });
+
+test("astral-plane CJK (surrogate pairs) and the compatibility ranges are wide", () => {
+  expect(displayWidth("\u{20000}")).toBe(2); // CJK Extension B
+  expect(displayWidth("\u{30000}")).toBe(2); // CJK Extension G
+  expect(displayWidth("a\u{20000}b")).toBe(4);
+  expect(fit("\u{20000}\u{20000}", 3)).toBe("\u{20000}…");
+  expect(displayWidth("ᄀ")).toBe(2); // Hangul Jamo
+  expect(displayWidth("豈")).toBe(2); // CJK Compatibility Ideographs
+  expect(displayWidth("︰")).toBe(2); // CJK Compatibility Forms
+  expect(displayWidth("￠")).toBe(2); // Fullwidth signs
+});
