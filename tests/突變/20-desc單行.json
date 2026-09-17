@@ -1,0 +1,14 @@
+[
+  {
+    "label": "descOfTurn: newlines kept",
+    "file": "plugins/telltale/hooks/observe.ts",
+    "old": "return firstLine.trim().replace(CONTROL_CHARS_RE, \"\").slice(0, 60);",
+    "new": "return firstLine.slice(0, 60);"
+  },
+  {
+    "label": "descOfTurn: notification not recognised",
+    "file": "plugins/telltale/hooks/observe.ts",
+    "old": "    if (tag === \"task-notification\") {",
+    "new": "    if (false) {"
+  }
+]
