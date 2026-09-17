@@ -1,0 +1,20 @@
+[
+  {
+    "label": "layout: total cap ignores BAND_ROWS_MAX",
+    "file": "hooks/layout.ts",
+    "old": "Math.min(maxRows, BAND_ROWS_MAX)",
+    "new": "maxRows"
+  },
+  {
+    "label": "layout: dropped panels are not reported",
+    "file": "hooks/layout.ts",
+    "old": "dropped.push(p.id);",
+    "new": "void p.id;"
+  },
+  {
+    "label": "layout: half a panel is drawn",
+    "file": "hooks/layout.ts",
+    "old": "dropped.push(p.id);",
+    "new": "slots.push({ id: p.id, rows: remaining }); remaining = 0;"
+  }
+]
