@@ -18,6 +18,10 @@ from pathlib import Path
     "$.store.get",
     "$.store.set",
     "$.command.register",
+    "$.agent.list",
+    "$.env.get",
+    "$.ui.open",
+    "$.ui.close",
 }
 
 

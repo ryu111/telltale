@@ -74,7 +74,7 @@ test("unknown id is reported, never guessed", () => {
 });
 
 test("command.run hook: writes the store, invalidates, answers { text } without next", async () => {
-  const eng = fakeEngine({ now: 1000 });
+  const eng = fakeEngine({ now: 1000, env: { TELLTALE_DEV: "1" } });
   register(eng.on, {});
   await eng.fire("session.start", {});
   const before = eng.invalidations;
@@ -100,7 +100,7 @@ test("tokens are case-sensitive: Hello / STATUS / On are not the lowercase comma
 });
 
 test("command.run hook: a set that changes nothing writes nothing and does not invalidate", async () => {
-  const eng = fakeEngine({ now: 1000 });
+  const eng = fakeEngine({ now: 1000, env: { TELLTALE_DEV: "1" } });
   register(eng.on, {});
   await eng.fire("session.start", {});
   const sets = eng.calls["$.store.set"] ?? 0;
