@@ -241,13 +241,14 @@ const colsToLine = (cols: readonly Col[]): CellLine => {
 const kindTone = (stepName: string): Tone2 =>
   stepName === "think" ? "violet" : stepName === "Agent" ? "amber" : stepName === "reply" ? "green" : stepName === "prompt" ? "grey" : "blue";
 
-// Symbol + tones for step `i` of `cell`. The last step is always "current"
-// (this ticket never models an arriving/pending node — see file header).
+// Symbol + tones for step `i` of `cell`, at time `now`. "Current" is the
+// arrived node (curIx), not always the last step — while the newest node is
+// still in transit, the previous one stays lit as current (ticket 15, I18).
 // Priority, per the ticket's Tone2 table: "整個 cell 降到極暗灰" beats
 // "符號保留種類色" whenever the cell isn't running, EXCEPT the current
 // node of a failed cell, which stays the dedicated "currentFailed" red.
-const nodeGlyph = (cell: Cell, i: number): { symbol: string; symbolTone: Tone2; nameTone: Tone2 } => {
-  const isCurrent = i === cell.steps.length - 1;
+const nodeGlyph = (cell: Cell, i: number, now: number): { symbol: string; symbolTone: Tone2; nameTone: Tone2 } => {
+  const isCurrent = cell.status === "running" ? i === curIx(cell, now) : i === cell.steps.length - 1;
   if (cell.status !== "running") {
     if (cell.status === "failed" && isCurrent) {
       // Tone2 table: the failed glyph itself is "red" (same as the border);
@@ -256,7 +257,12 @@ const nodeGlyph = (cell: Cell, i: number): { symbol: string; symbolTone: Tone2; 
     }
     return { symbol: SYMBOLS.walked, symbolTone: "greyDeep", nameTone: "greyDeep" };
   }
-  if (isCurrent) return { symbol: SYMBOLS.current, symbolTone: "current", nameTone: "current" };
+  if (isCurrent) {
+    // DESIGN §3 breathing: alternate the current node's tone so callers can
+    // tell the two border-weight states apart (tone stands in for weight).
+    const breatheTone: Tone2 = isBreathing(now) ? "current" : "white";
+    return { symbol: SYMBOLS.current, symbolTone: breatheTone, nameTone: breatheTone };
+  }
   return { symbol: SYMBOLS.walked, symbolTone: kindTone(cell.steps[i]!.name), nameTone: "greyDim" };
 };
 
@@ -296,16 +302,30 @@ const headerCols = (cell: Cell, w: number, now: number, frame: number): Col[] =>
 
 // ---------- v1: header + 3-row horizontal box chain ----------
 
-const buildV1Chain = (cell: Cell, w: number): { top: Col[]; mid: Col[]; bot: Col[] } => {
+// The arriving node (curIx + 1 while in transit) grows its box from 3 to
+// NODE_W columns and reveals its name a character at a time, both driven by
+// the same typewriterProgress value (ticket 15).
+const arrivingBoxWidth = (cell: Cell, i: number, now: number): number => {
+  const inTransit = cell.status === "running" && i === curIx(cell, now) + 1 && i === cell.steps.length - 1;
+  if (!inTransit) return NODE_W;
+  return Math.max(3, Math.ceil(NODE_W * typewriterProgress(cell.steps[i]!.t0, now)));
+};
+
+const buildV1Chain = (cell: Cell, w: number, now: number): { top: Col[]; mid: Col[]; bot: Col[] } => {
   let top: Col[] = [];
   let mid: Col[] = [];
   let bot: Col[] = [];
   const bt = borderTone(cell);
+  const ci = curIx(cell, now);
   cell.steps.forEach((step, i) => {
-    const { symbol, symbolTone, nameTone } = nodeGlyph(cell, i);
-    const name = step.name;
-    const nodeName = pad(fit(name, NODE_W - 4), NODE_W - 4);
-    top = [...top, ...toCols(`${SYMBOLS.boxTL}${SYMBOLS.edgeDash.repeat(NODE_W - 2)}${SYMBOLS.boxTR}`, bt)];
+    const { symbol, symbolTone, nameTone } = nodeGlyph(cell, i, now);
+    const boxW = arrivingBoxWidth(cell, i, now);
+    const inTransit = boxW < NODE_W;
+    const name = inTransit
+      ? step.name.slice(0, Math.ceil(step.name.length * typewriterProgress(step.t0, now)))
+      : step.name;
+    const nodeName = inTransit ? pad(fit(name, boxW - 4), boxW - 4) : pad(fit(name, NODE_W - 4), NODE_W - 4);
+    top = [...top, ...toCols(`${SYMBOLS.boxTL}${SYMBOLS.edgeDash.repeat(boxW - 2)}${SYMBOLS.boxTR}`, bt)];
     mid = [
       ...mid,
       ...toCols(SYMBOLS.boxV, bt),
@@ -313,10 +333,20 @@ const buildV1Chain = (cell: Cell, w: number): { top: Col[]; mid: Col[]; bot: Col
       ...toCols(nodeName, nameTone),
       ...toCols(SYMBOLS.boxV, bt),
     ];
-    bot = [...bot, ...toCols(`${SYMBOLS.boxBL}${SYMBOLS.edgeDash.repeat(NODE_W - 2)}${SYMBOLS.boxBR}`, bt)];
+    bot = [...bot, ...toCols(`${SYMBOLS.boxBL}${SYMBOLS.edgeDash.repeat(boxW - 2)}${SYMBOLS.boxBR}`, bt)];
     if (i < cell.steps.length - 1) {
-      top = [...top, ...toCols(" ".repeat(EDGE_W), bt)];
-      mid = [...mid, ...toCols(`${SYMBOLS.edgeDash.repeat(EDGE_W - 1)}${SYMBOLS.edgeArrow}`, edgeTone(cell))];
+      // Only the last edge (curIx -> curIx+1) ever carries the packet.
+      const packet = i === ci ? packetAt(cell, EDGE_W, now) : null;
+      let edgeTop: Col[] = toCols(" ".repeat(EDGE_W), bt);
+      let edgeMid: Col[];
+      if (packet === null) {
+        edgeMid = toCols(`${SYMBOLS.edgeDash.repeat(EDGE_W - 1)}${SYMBOLS.edgeArrow}`, edgeTone(cell));
+      } else {
+        const chars = Array.from({ length: EDGE_W }, (_, k) => (k === packet ? SYMBOLS.packet : SYMBOLS.packetTail));
+        edgeMid = toCols(chars.join(""), edgeTone(cell));
+      }
+      top = [...top, ...edgeTop];
+      mid = [...mid, ...edgeMid];
       bot = [...bot, ...toCols(" ".repeat(EDGE_W), bt)];
     }
   });
@@ -330,7 +360,7 @@ const buildV1Chain = (cell: Cell, w: number): { top: Col[]; mid: Col[]; bot: Col
 const renderV1 = (cell: Cell, w: number, h: number, now: number, frame: number): CellLine[] => {
   const header = colsToLine(headerCols(cell, w, now, frame));
   if (isCollapsed(cell, now)) return [header];
-  const { top, mid, bot } = buildV1Chain(cell, w);
+  const { top, mid, bot } = buildV1Chain(cell, w, now);
   return [header, colsToLine(top), colsToLine(mid), colsToLine(bot)].slice(0, Math.max(0, h));
 };
 
@@ -341,7 +371,7 @@ const renderV1 = (cell: Cell, w: number, h: number, now: number, frame: number):
 
 const v2NodeRow = (cell: Cell, i: number, inner: number, now: number): Col[] => {
   const step = cell.steps[i]!;
-  const { symbol, symbolTone, nameTone } = nodeGlyph(cell, i);
+  const { symbol, symbolTone, nameTone } = nodeGlyph(cell, i, now);
   const running = cell.status === "running";
   const name = pad(fit(step.name, 10), 10);
   const detailW = Math.max(0, inner - 22);
@@ -418,11 +448,56 @@ export const renderMainHistory = (count: number, recentDesc: string, w: number):
   return { spans: [{ text: prefix + fit(recentDesc, remaining), tone: "greyDeep" }] };
 };
 
+// ============================================================================
+// Ticket 15: time-driven dynamics — pure functions over (cell, now/frame).
+// `Cell` stores no visual state; every visual effect (breathing, typewriter,
+// packet, camera, collapse, vanish, slide-in) is derived here. SDD §1.1a,
+// §2.6a, I18.
+// ============================================================================
+
+/** Index of the node currently "lit" (arrived): the second-to-last node while the newest is still in transit. */
+export const curIx = (cell: Cell, now: number): number => {
+  const last = cell.steps[cell.steps.length - 1]!;
+  const inTransit = cell.status === "running" && cell.steps.length > 1 && now - last.t0 < TRANSIT_MS;
+  return inTransit ? cell.steps.length - 2 : cell.steps.length - 1;
+};
+
+/** Position (in [0, edgeLen)) of the traveling light dot on the last edge, or null if nothing is in transit. */
+export const packetAt = (cell: Cell, edgeLen: number, now: number): number | null => {
+  if (cell.status !== "running" || cell.steps.length < 2) return null;
+  const last = cell.steps[cell.steps.length - 1]!;
+  const age = now - last.t0;
+  if (age < 0 || age >= TRANSIT_MS) return null;
+  return Math.min(edgeLen - 1, Math.floor((age / TRANSIT_MS) * edgeLen));
+};
+
+/** Horizontal (v1/v4) camera target: newest node's right edge plus CAMERA_MARGIN of breathing room. */
+export const cameraTarget = (stripW: number, w: number): number => Math.max(0, stripW - w + CAMERA_MARGIN);
+
+/** Ease `cur` toward `target` by CAMERA_GAIN per call; snap once within 1. Not rounded — caller rounds when consuming. */
+export const easeCamera = (cur: number, target: number): number => (Math.abs(target - cur) < 1 ? target : cur + (target - cur) * CAMERA_GAIN);
+
+/** Reveal progress in [0, 1] since the current node *arrived* (not since it was born). */
+export const typewriterProgress = (t0: number, now: number): number => {
+  const age = Math.max(0, now - t0 - TRANSIT_MS);
+  return age >= BIRTH_MS ? 1 : age / BIRTH_MS;
+};
+
+/** Breathing toggle for the current node's border weight — flips every BREATHE_MS. */
+export const isBreathing = (now: number): boolean => Math.floor(now / BREATHE_MS) % 2 === 0;
+
+/** Whether `cell` had an event within the last FLASH_MS — drives the "just updated" flash border. */
+export const isFlashing = (cell: Cell, now: number): boolean => now - cell.updatedAt < FLASH_MS;
+
+/** Columns of left (or top) margin remaining for a slide-in newborn cell; 0 once SLIDE_MS has elapsed. */
+export const slideOffset = (bornAt: number, now: number): number =>
+  Math.max(0, Math.round((1 - Math.min(1, (now - bornAt) / SLIDE_MS)) * (NODE_W + 2)));
+
 /**
  * Static layout for a cell in one of the three styles. `frame` only drives
- * the running-cell spinner glyph; `cam` is accepted for the ticket-15
- * signature but this ticket always hard-locks it to the settled target
- * (see file header) instead of easing toward it.
+ * the running-cell spinner glyph. `cam` carries the horizontal camera's
+ * eased offset for v1/v4 (§1 DESIGN); v2's vertical camera is hard-locked
+ * (no easing) and passes `cam` through unchanged.
  */
 export const renderCell = (
   cell: Cell,
@@ -435,20 +510,22 @@ export const renderCell = (
 ): { lines: CellLine[]; cam: CameraState } => {
   if (style === "v1") {
     const stripW = cell.steps.length * NODE_W + Math.max(0, cell.steps.length - 1) * EDGE_W;
-    return { lines: renderV1(cell, w, h, now, frame), cam: { offset: Math.max(0, stripW - w) } };
+    const offset = easeCamera(cam.offset, cameraTarget(stripW, w));
+    return { lines: renderV1(cell, w, h, now, frame), cam: { offset } };
   }
   if (style === "v4") {
     const header = colsToLine(headerCols(cell, w, now, frame));
     if (isCollapsed(cell, now)) return { lines: [header], cam: { offset: 0 } };
     let chain: Col[] = toCols(" ", "greyDeep");
     cell.steps.forEach((step, i) => {
-      const { symbol, symbolTone, nameTone } = nodeGlyph(cell, i);
+      const { symbol, symbolTone, nameTone } = nodeGlyph(cell, i, now);
       chain = [...chain, ...toCols(symbol, symbolTone), ...toCols(` ${step.name}`, nameTone)];
       if (i < cell.steps.length - 1) chain = [...chain, ...toCols(` ${SYMBOLS.edgeDash}${SYMBOLS.edgeArrow} `, edgeTone(cell))];
     });
     const line2 = colsToLine(fitLeft(windowRight(chain, w), w, "greyDeep"));
     const chainW = colsWidth(chain);
-    return { lines: [header, line2].slice(0, Math.max(0, h)), cam: { offset: Math.max(0, chainW - w) } };
+    const offset = easeCamera(cam.offset, cameraTarget(chainW, w));
+    return { lines: [header, line2].slice(0, Math.max(0, h)), cam: { offset } };
   }
   return { lines: renderV2Layout(cell, w, h, now, frame), cam };
 };

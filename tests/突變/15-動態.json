@@ -1,0 +1,26 @@
+[
+  {
+    "label": "TRANSIT_MS collapsed to 0 — packets never render",
+    "file": "plugins/telltale/hooks/cells.ts",
+    "old": "export const TRANSIT_MS = 600;",
+    "new": "export const TRANSIT_MS = 0;"
+  },
+  {
+    "label": "CAMERA_MARGIN collapsed to 0 — newest node sits flush against the edge",
+    "file": "plugins/telltale/hooks/cells.ts",
+    "old": "export const CAMERA_MARGIN = 28;",
+    "new": "export const CAMERA_MARGIN = 0;"
+  },
+  {
+    "label": "curIx: never reports in-transit — node lights up instantly on arrival",
+    "file": "plugins/telltale/hooks/cells.ts",
+    "old": "const inTransit = cell.status === \"running\" && cell.steps.length > 1 && now - last.t0 < TRANSIT_MS;",
+    "new": "const inTransit = false;"
+  },
+  {
+    "label": "easeCamera: gain removed — camera jumps straight to target, no smoothing",
+    "file": "plugins/telltale/hooks/cells.ts",
+    "old": "export const easeCamera = (cur: number, target: number): number => (Math.abs(target - cur) < 1 ? target : cur + (target - cur) * CAMERA_GAIN);",
+    "new": "export const easeCamera = (cur: number, target: number): number => target;"
+  }
+]
