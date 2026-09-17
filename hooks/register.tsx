@@ -5,7 +5,11 @@
 import type { On, PluginOptions, Register } from "claude-code";
 import { runTelltale, type TelltaleState } from "./command";
 import { BAND_ROWS_MAX, layout, MIN_COLUMNS } from "./layout";
+import type { BandPanel, BandProps } from "./hit";
 import type { Panel } from "./panel";
+
+// The band's props are owned by hit.ts (pure); re-exported here so tests and band.tsx share one shape.
+export type { BandPanel, BandProps };
 import { PANELS } from "./panels/index";
 
 // SDD §3: a poll result whose JSON encoding exceeds this is dropped, not stored.
@@ -111,13 +115,15 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
       <Client
         key="band"
         module="Band"
-        props={{
-          columnsHint: viewportColumns ?? 80,
-          total,
-          panels: bandPanels,
-          dropped,
-          now,
-        }}
+        props={
+          {
+            columnsHint: viewportColumns ?? 80,
+            total,
+            panels: bandPanels,
+            dropped,
+            now,
+          } satisfies BandProps
+        }
       />
     );
   });

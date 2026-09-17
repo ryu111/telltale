@@ -86,3 +86,27 @@ test("command.run hook: writes the store, invalidates, answers { text } without 
   expect((again as { text: string }).text).toContain("○ clock  off");
   expect(eng.invalidations).toBe(before + 1); // status does not invalidate
 });
+
+test("unknown id leaves panels untouched (error path returns the input toggles)", () => {
+  expect(runTelltale("helo", state()).panels).toEqual({ hello: true, clock: true });
+  expect(runTelltale("helo off", state()).panels).toEqual({ hello: true, clock: true });
+});
+
+test("tokens are case-sensitive: Hello / STATUS / On are not the lowercase commands", () => {
+  expect(runTelltale("Hello", state()).text).toBe('unknown panel "Hello"; known: hello, clock');
+  const usage = "usage: /telltale [status|help|on|off|<panel> [on|off]]  panels: hello, clock";
+  expect(runTelltale("STATUS", state()).text).toBe('unknown panel "STATUS"; known: hello, clock');
+  expect(runTelltale("hello On", state()).text).toBe(usage);
+});
+
+test("command.run hook: a set that changes nothing writes nothing and does not invalidate", async () => {
+  const eng = fakeEngine({ now: 1000 });
+  register(eng.on, {});
+  await eng.fire("session.start", {});
+  const sets = eng.calls["$.store.set"] ?? 0;
+  const inv = eng.invalidations;
+  const out = await eng.fire("command.run", { command: "telltale", args: "clock on", origin: { kind: "composer" } });
+  expect(out).toEqual({ text: "clock: on (unchanged)" });
+  expect(eng.calls["$.store.set"] ?? 0).toBe(sets);
+  expect(eng.invalidations).toBe(inv);
+});
