@@ -1,0 +1,26 @@
+[
+  {
+    "label": "render: hasSurvey does not yield",
+    "file": "hooks/register.tsx",
+    "old": "if (e.props.hasSurvey) return next(e);",
+    "new": "if (false) return next(e);"
+  },
+  {
+    "label": "render: dropped not passed to Client",
+    "file": "hooks/register.tsx",
+    "old": "panels: bandPanels,\n          dropped,\n          now,\n        }}",
+    "new": "panels: bandPanels,\n          dropped: [],\n          now,\n        }}"
+  },
+  {
+    "label": "tick: oversized data still stored",
+    "file": "hooks/register.tsx",
+    "old": "if (bytes > DATA_MAX_BYTES) {",
+    "new": "if (false) {"
+  },
+  {
+    "label": "toggle: store not written",
+    "file": "hooks/register.tsx",
+    "old": "await $.store.set(\"panels\", current);",
+    "new": "void current;"
+  }
+]
