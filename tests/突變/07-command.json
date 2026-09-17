@@ -8,7 +8,7 @@
   {
     "label": "command: set on when already on reports a change",
     "file": "plugins/telltale/hooks/command.ts",
-    "old": "if (from === to) return { text: setLine(id, from, to), panels: state.panels };",
-    "new": "if (from === to) return { text: `${id}: ${word(from)} → ${word(to)}`, panels: state.panels };"
+    "old": "if (from === to) return { text: setLine(id, from, to), panels: state.panels, sizes: state.sizes };",
+    "new": "if (from === to) return { text: `${id}: ${word(from)} → ${word(to)}`, panels: state.panels, sizes: state.sizes };"
   }
 ]

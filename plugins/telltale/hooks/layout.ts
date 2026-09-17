@@ -10,6 +10,25 @@ export type Want = { id: string; minRows: number; wantRows: number };
 export type Slot = { id: string; rows: number };
 export type Layout = { slots: Slot[]; dropped: string[]; total: number };
 
+// SDD §1.2 rule 8 (v0.2, stages): a panel may declare `stages` (the shape a
+// panel author writes; the values themselves don't feed the mapping below —
+// they only mark "this panel supports stages").
+export type Stage = "summary" | "compact" | "full";
+export type Stages = { summary: 0; compact: number; full: "rest" };
+export const STAGE_ORDER: readonly Stage[] = ["summary", "compact", "full"];
+export const nextStage = (stage: Stage): Stage =>
+  STAGE_ORDER[(STAGE_ORDER.indexOf(stage) + 1) % STAGE_ORDER.length]!;
+export const rowsForStage = (stage: Stage): { minRows: number; wantRows: number } => {
+  switch (stage) {
+    case "summary":
+      return { minRows: 0, wantRows: 0 };
+    case "compact":
+      return { minRows: 2, wantRows: 3 };
+    case "full":
+      return { minRows: 3, wantRows: CONTENT_ROWS_MAX };
+  }
+};
+
 export const layout = (panels: readonly Want[], maxRows: number): Layout => {
   if (panels.length === 0) {
     return { slots: [], dropped: [], total: 1 };

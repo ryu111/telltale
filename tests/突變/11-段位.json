@@ -1,0 +1,26 @@
+[
+  {
+    "label": "layout: full stage no longer gets the remaining rows",
+    "file": "plugins/telltale/hooks/layout.ts",
+    "old": "return { minRows: 3, wantRows: CONTENT_ROWS_MAX };",
+    "new": "return { minRows: 3, wantRows: 3 };"
+  },
+  {
+    "label": "layout: stage cycle skips full",
+    "file": "plugins/telltale/hooks/layout.ts",
+    "old": "STAGE_ORDER[(STAGE_ORDER.indexOf(stage) + 1) % STAGE_ORDER.length]!;",
+    "new": "STAGE_ORDER[(STAGE_ORDER.indexOf(stage) + 2) % STAGE_ORDER.length]!;"
+  },
+  {
+    "label": "hit: staged panel's title click posts toggle, not stage",
+    "file": "plugins/telltale/hooks/hit.ts",
+    "old": "props.panels.find((p) => p.id === id)?.stages ? \"stage\" : \"toggle\";",
+    "new": "\"toggle\";"
+  },
+  {
+    "label": "register: stage click never persists to the store",
+    "file": "plugins/telltale/hooks/register.tsx",
+    "old": "await $.store.set(`size.${data.id}`, toStage);",
+    "new": "void toStage;"
+  }
+]
