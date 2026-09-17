@@ -11,6 +11,19 @@
 | 07-command | §1.6；§3 command.run | `hooks/command.test.ts` | command.ts、register.tsx、mutations.json | 05 |
 | 手動/08-寬度實測 | 切片 #8；I4、I11；DoD #4 | 腳本＋`docs/實測/寬度.md` | scripts/量寬度.sh | 06 |
 | 09-發佈 | 切片 #9；§2.5；題目 §6.3 | `tests/單元/test_readme.py` | README.md、LICENSE、check.yml | 06、07 |
+| 10-cells基礎 | 切片 #10；§1.1a；I15 | `tests/hooks/cells.test.ts` | cells.ts | — |
+| 11-段位 | 切片 #11；§1.2 規則 8；§1.5 v0.2；§1.6 size | `tests/hooks/stages.test.ts` | layout.ts、hit.ts、register.tsx、command.ts、panel.ts(stages) | — |
+| 12-觀察hooks | 切片 #12；§2.6a；I12⊆、I13、I17 | `tests/hooks/observe.test.tsx` | observe.ts、register.tsx、harness.ts | 11 |
+| 13-agents面板 | 切片 #13；§2.6、§2.7、§2.1 cells；I16 | `tests/hooks/agents.test.ts` | panels/agents.ts、panels/index.ts、register.tsx、panel.ts、plugin.json | 12 |
+| 14-renderCell | 切片 #14；§1.1a renderCell；DESIGN §1–2；I4、I14 | `tests/hooks/cells-render.test.ts` | cells.ts | 10 |
+| 15-動態 | 切片 #15；DESIGN §3；I18 | `tests/hooks/cells-dynamics.test.ts` | cells.ts | 14 |
+| 16-band-cells | 切片 #16；§1.5 v0.2；DESIGN §4、§6；I12 恰好 | 手動 `docs/實測/agents.md` | band.tsx、register.tsx、hit.ts | 13、15 |
+| 17-agents指令與點擊 | 切片 #17；§1.6 v0.2；§2.6 onRow | `tests/hooks/agents-command.test.ts` | command.ts、panels/agents.ts、panel.ts、register.tsx | 13、16 |
+| 18-發佈v0.2 | 切片 #18；§2.5 | `tests/單元/test_readme_v02.py`＋寬度腳本 | README×2、docs/實測/寬度.md | 16、17 |
+| 19-plugin-test評估 | 切片 #19；§4 | 手動 `docs/實測/plugin-test.md` | tests/plugin-test/ | — |
+
+v0.2 批次（可碰檔案不交集才同批）：B1 {10, 11, 19} → B2 {12, 14} → B3 {13, 15} → B4 {16} → B5 {17} → B6 {18}。
+v0.2 檢查（出題者對過）：12／13／16／17 的路徑已改成 `plugins/telltale/…` 全路徑（範圍 hook 比對整串）；harness 擴充歸 12；`Panel.stages` 由 11 加欄位；`turn.step` 的 toolUses 在 result；`session.receive` matcher 是物件。
 
 檢查（出題者自己對過）：
 - 每張票的驗收測試都對到上表的 SDD 條目；I9 由 01 的 `test_不hook_tool_call` 與 05 的 exact-seven 涵蓋。

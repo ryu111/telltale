@@ -255,7 +255,7 @@ v0.2 追加的鍵（仍是完備表；每鍵 < 64 KiB，I5 同樣適用）：
 - `id: "agents"`, `label: "agents"`, `defaultOn: true`, `needsAgents: true`, `stages: { summary: 0, compact: 3, full: "rest" }`, `everyMs: 1000`。
 - **poll**（每秒）：`io.agents()` → 對照 `agents.cells` 裡 `kind === "sub"` 的 cell：新 id 開 cell（`firstAt = now`，steps `[prompt]`，desc＝description）；status 從 running 變成其他 → `endAt = now`、`updatedAt = now`、push `reply` 或標 failed／killed；`completed` 且 `now - endAt > VANISH_AFTER_MS` 的刪；failed／killed 留到 `dismissed`。**`agents.cells` 是唯一的 store 鍵**（`seen`／`tasks`／`turn` 不存在，是舊稿）。
 - **model 對回去**：`turn.step` 看到 `Agent` 工具 input（`description`、`model?`、`subagent_type`）就記到 `pendingSpawns`（記憶體，不進 store）；下一次 poll 出現的新 sub cell 若 `description` 相同，取最早一筆的 `model` 寫進 `cell.model` 並移除那筆，配不到就空。**已知限制**：同 description 同時派兩個時，model 可能配錯（實作註解要寫明，不是 bug）。
-- **背景任務**：`turn.step` 的 toolUses 裡 `Bash{ run_in_background: true }` → 開 `kind: "bg"` 的 cell（label `bg`、desc 取 input.description，缺就 command 前 40 字）；工具名 `Monitor`／`Workflow`（2.1.274 型別檔工具表裡的真實名字，大小寫照抄）同理。`session.receive{origin=task-notification}` 的 text 用 regex `Background command "([^"]+)" completed|Task "([^"]+)"|Workflow "([^"]+)"` 抓 description，關掉最早一條同名未結束的 bg cell。**已知限制**：同名並行的背景任務可能關錯條（使用者裁定守規矩不拿精確 id）；點 cell 可手動點掉。兩級判定（挑毛病後）：`now - firstAt > LONG_RUN_MS(30 min)` 只把經過時間變黃（久跑，仍 running）；`> ORPHAN_MS(2 h)` 且沒通知才 `status: "orphan"`（符號 `?` 黃），留到點掉或 `/telltale agents clear`；不自動刪。
+- **背景任務**：`turn.step` 的 toolUses 裡 `Bash{ run_in_background: true }` → 開 `kind: "bg"` 的 cell（label `bg`、desc 取 input.description，缺就 command 前 40 字）；工具名 `Monitor`／`Workflow`（2.1.274 型別檔工具表裡的真實名字，大小寫照抄）同理。`session.receive`（matcher `{ origin: { kind: "task-notification" } }`，2.1.274 的 origin 是物件）的 text 用 regex `Background command "([^"]+)" completed|Task "([^"]+)"|Workflow "([^"]+)"` 抓 description，關掉最早一條同名未結束的 bg cell。**已知限制**：同名並行的背景任務可能關錯條（使用者裁定守規矩不拿精確 id）；點 cell 可手動點掉。兩級判定（挑毛病後）：`now - firstAt > LONG_RUN_MS(30 min)` 只把經過時間變黃（久跑，仍 running）；`> ORPHAN_MS(2 h)` 且沒通知才 `status: "orphan"`（符號 `?` 黃），留到點掉或 `/telltale agents clear`；不自動刪。
 - **主迴圈**：`turn.start` → 開 `kind: "main"` 的 cell（id＝turnId、desc＝text 前 60 字、steps `[prompt]`）；`ui.render{Spinner}` → 記憶體 phase（此 hook 一定 `return next(e)`，不畫），phase ∈ {responding, thinking, requesting} 且最後一個節點不是 `think` → push `think`；`turn.step` → 每個 toolUse push 一個節點；`turn.complete` → push `reply`、`endAt`。**main 歷史（使用者裁定）**：完成的 main cell 收合後不各留一列，而是合併成一列 `✓ N turns · <最近一輪 desc>`，點了展開最近 3 輪 10 s；running 的 main 永遠是獨立 cell。
 - **呈現（2026-09-17 定案，DESIGN.md §0–§5）**：一個 cell 一個任務（main 這輪、每個 subagent、每個背景任務），三種樣式 v1／v2／v4 由 `style.agents` 決定（預設：貼側邊 v2、貼上下 v1）。每個 cell 的資料是 `{ id, kind: "main"|"sub"|"bg", label, model?, desc, status, firstAt, endAt?, steps: [{ name, detail?, t0, t1? }] }`；`steps` 由框架從事件累積（§2.6a），面板不再自己排版列，而是交給 Client 的純函式 `renderCell(cell, style, w, h, now, frame, cam)`（`hooks/cells.ts`）。排序：running 先、再 firstAt、再 id；塞不下的 cell 收成 `… +N more`。`rows === 0`（summary 段）只有面板標題列：`⠼ 3 running · 1 done · 1 ✗`。
 - **不做 lanes／tree**（訪談淘汰，樣本留 `docs/設計/試衣間-第一輪.html`）。
@@ -271,7 +271,7 @@ v0.2 追加的鍵（仍是完備表；每鍵 < 64 KiB，I5 同樣適用）：
 |---|---|
 | `prompt` | `turn.start`（main）；subagent 出現在 `agent.list` 時（`spawned`） |
 | `think` | `ui.render{Spinner}` 的 `mode` ∈ {responding, thinking, requesting} 且前一個節點不是 think |
-| 工具名 | `turn.step.toolUses[]`（每個 tool use 一個節點；`Bash` 的 `description`／command 前 40 字當 detail）；`Agent` 節點同時開一個 sub cell（description＝input.description） |
+| 工具名 | `turn.step` 的 **result**（`await next(e)` 之後的 `toolUses[]`；2.1.274 的 `TurnStepInput` 沒有 toolUses）（每個 tool use 一個節點；`Bash` 的 `description`／command 前 40 字當 detail）；`Agent` 節點同時開一個 sub cell（description＝input.description） |
 | `reply` | `turn.complete`（main）；`agent.list` 的 status 變 completed（sub）；task-notification（bg） |
 | 失敗 | status failed／killed；bg 30 min 無通知 → 孤兒 |
 
@@ -279,7 +279,7 @@ subagent 迴圈的 `turn.step` 是否帶 `agentId` 送進來 → 票 16 實測�
 
 #### 2.7 hello／clock 只在開發模式註冊
 
-`register` 時讀 `$.env.get("TELLTALE_DEV")`；等於 `"1"` 才把 hello／clock 放進 PANELS，否則只有 agents。`plugin.json` 的 `userConfig` 刪掉 `panel_hello`／`panel_clock`（沒有公開面板需要種子）。`calls:` 因此多 `$.env.get`（題目白名單本來就有）。第一輪的 register／band 測試改走 `makeRegister([...])` 注入面板，不依賴環境變數。
+`session.start` 內讀 `$.env.get("TELLTALE_DEV")`（`register(on, options)` 當下沒有 `$`）並快取在閉包；等於 `"1"` 才把 hello／clock 放進 PANELS，否則只有 agents。`plugin.json` 的 `userConfig` 刪掉 `panel_hello`／`panel_clock`（沒有公開面板需要種子）。`calls:` 因此多 `$.env.get`（題目白名單本來就有）。第一輪的 register／band 測試改走 `makeRegister([...])` 注入面板，不依賴環境變數。
 
 #### 2.4 面板開關為什麼不用 `userConfig`
 
@@ -376,9 +376,9 @@ v0.2 追加：fakeEngine 多 `agents: AgentInfo[]`（`$.agent.list` 回它的副
 | I9 | 不 hook `tool.call`／`classic.*`、不宣告 `process.*`／`fs.*`／`http.*`；`hooks.json` 只列一個 module | I1 涵蓋 |
 | I10 | 面板 `view` 拿到 `undefined` 也畫（不空白） | 單元測試 |
 | I11 | 每個寬度 ≥ MIN_COLUMNS 且 maxRows ≥ 4 時，畫面上至少有一行面板內容（擋「全砍掉就不會超寬」） | 切片 8 的腳本每步斷言 |
-| I12（v0.2） | `calls:` 恰好 = 七個 ＋ `$.agent.list` ＋ `$.env.get` ＋ `$.ui.open` ＋ `$.ui.close`（Pane 需要；`$.ui.*` 只畫東西，題目 DoD #1 的字面清單據此擴充，README 要說明）；`hooks:` 恰好 = 第一輪四個 ＋ `turn.start`、`turn.step`、`turn.complete`、`ui.render{component=Spinner}`、`session.receive{origin=task-notification}`；仍無 `tool.call`／`classic.*` | I1 的測試改成 v0.2 的兩行 exact；README 區塊同步 |
+| I12（v0.2） | `calls:` 恰好 = 七個 ＋ `$.agent.list` ＋ `$.env.get` ＋ `$.ui.open` ＋ `$.ui.close`（Pane 需要；`$.ui.*` 只畫東西，題目 DoD #1 的字面清單據此擴充，README 要說明）；`hooks:` 恰好 = 第一輪四個 ＋ `turn.start`、`turn.step`、`turn.complete`、`ui.render{component=Spinner}`、`ui.render{component=Pane}`、`session.receive{origin=task-notification}`（十個；恰好的 exact 測試由票 16 收緊，12／13 只驗 ⊆）；仍無 `tool.call`／`classic.*` | I1 的測試改成 v0.2 的兩行 exact；README 區塊同步 |
 | I13（v0.2） | 每個 hook 都 `return next(e)`（觀察型 hook 不改任何事件的結果），且每種事件對 `agents.cells` 的寫入內容正確 | 流程測試：每種事件打進去，`next` 恰好一次且回傳 === next 的回傳，**並斷言寫進 store 的 cell 內容**（節點名、t0、desc）；突變：拿掉一個 `return next(e)`、把節點名寫死 |
-| I14（v0.2） | `composeLive` 輸出的 `displayWidth ≤ columns`，任何 `now`／`frame`／`live` 組合 | 單元測試（含 columns 20、label 全中文、bar 視窗 0 寬）；突變：elapsed 不裁 |
+| I14（v0.2） | `renderCell` 輸出的每一列 `displayWidth ≤ w`，任何 `now`／`frame`／`cam`／style／cell 組合 | 單元＋property 測試（含 w 20、任務名稱全中文、64 步）；突變：elapsed 不裁 |
 | I15（v0.2） | 排序穩定：同一組 cells 任何順序輸入，`sortCells` 輸出相同；running 在前，其後依 firstAt，再依 id | property 測試（隨機打亂 50 次，含同 firstAt 的案例） |
 | I16（v0.2） | failed／killed／orphan 不會自動消失；completed 60 s 後一定消失、59 s 時一定還在 | 流程測試：假時鐘推 59 s 與 61 s，混雜 failed 與 completed |
 | I17（v0.2） | 背景任務 cell 只被同 description 的通知關掉；沒有通知的 30 min 後變孤兒、不刪 | 流程測試 |
