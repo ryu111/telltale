@@ -89,7 +89,7 @@ test("render hands a Client 'band' / module 'Band' whose props are plain JSON wi
   expect(c!.props.module).toBe("./band.tsx");
   const p = c!.props.props as Record<string, unknown>;
   expect(JSON.parse(JSON.stringify(p))).toEqual(p);
-  expect(Object.keys(p).sort()).toEqual(["columnsHint", "dropped", "now", "panels", "total"]);
+  expect(Object.keys(p).sort()).toEqual(["columnsHint", "dropped", "now", "panels", "status", "total"]);
 });
 
 test("I10: render before any data still draws every panel's placeholder", async () => {
