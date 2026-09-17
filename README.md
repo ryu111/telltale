@@ -14,7 +14,7 @@ claude plugin marketplace add ryu111/telltale
 claude plugin install telltale@telltale
 ```
 
-Tested on Claude Code 2.1.267; the function-hooks API is early access and may change.
+Tested on Claude Code 2.1.274 (v0.2); the function-hooks API is early access and may change.
 
 ## Layout
 
