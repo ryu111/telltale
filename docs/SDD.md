@@ -14,6 +14,9 @@
 | `userConfig` 欄位 `kind`／`label`；每欄自動變 `/config` 一列 | 官方文件：欄位是 `type`／`title`／`description`；`/config` 列要 **v2.1.269+**，本機 2.1.267 沒有 | 面板開關的真值放 `$.store`，由 `/telltale` 改；`userConfig` 只留 `default` 當第一次的種子。詳 §2.4 |
 | `$.store` 上限「全部加起來」（句子截斷） | 4 MiB JSON 文字；實體在 `~/.claude/plugins/store/`，跨 session、跨熱重載保留 | 不變量 I5；卸載見 §2.5 |
 | 型別檔約 10,900 行 | 8,752 行 | 無影響 |
+| `e.viewport.columns` 是 transcript 寬（200 欄回 110） | 〔實測 票 01〕150 欄的 tmux 回 `viewport=150`，就是終端寬；`maxRows` 在 34 列終端回 9 | `columnsHint` 直接用 `e.viewport?.columns ?? 80`；Band 仍以 `surface.columns` 為準 |
+| `userConfig` 鍵 `panel.hello` | 〔實測 票 01〕鍵含 `.` 被 validate 判 `Invalid input`（文件：keys must be valid identifiers） | 鍵改 `panel_hello`／`panel_clock` |
+| — | 〔實測 票 01〕plugin 根目錄放 `CLAUDE.md` 在 `--strict` 是 warning→exit 1（「not loaded as project context」） | 專案的 CLAUDE.md 搬到 `.claude/CLAUDE.md` |
 
 沒衝突、但題目沒寫而型別檔有寫的：
 - `ui.render` **每個輸入值只跑一次**（props、viewport 寬度、plugin 載入、`$.ui.invalidate("ui.render")`）；repaint 重用答案。資料更新後要自己 `invalidate`，每秒最多十次。
@@ -186,7 +189,7 @@ export function Band(props: BandProps, surface: ClientSurface<BandState>): Rende
 
 #### 2.4 面板開關為什麼不用 `userConfig`
 
-2.1.267 的 `userConfig` 只在 enable 時提示一次、`/config` 列要 2.1.269+；而且改 `userConfig` 會**重載整個 module**（題目 §3.5 實測）。開關放 `$.store` 就沒有重載：關掉一個面板只是下一次 render 少畫一塊，DoD #3 直接成立。`plugin.json` 仍宣告 `panel.hello`（`type: "boolean"`, `default: true`）：`session.start` 時 `panels` 鍵缺該 id 才拿 `options["panel.hello"]` 當種子，之後以 store 為準。
+2.1.267 的 `userConfig` 只在 enable 時提示一次、`/config` 列要 2.1.269+；而且改 `userConfig` 會**重載整個 module**（題目 §3.5 實測）。開關放 `$.store` 就沒有重載：關掉一個面板只是下一次 render 少畫一塊，DoD #3 直接成立。`plugin.json` 仍宣告 `panel_hello`（`type: "boolean"`, `default: true`）：`session.start` 時 `panels` 鍵缺該 id 才拿 `options["panel_hello"]` 當種子，之後以 store 為準。
 
 #### 2.5 安裝、開發、卸載（README 要寫的）
 
@@ -197,7 +200,7 @@ export function Band(props: BandProps, surface: ClientSurface<BandState>): Rende
 
 ```
 session.start
-  ├─ panels ← $.store.get("panels") ⊕ 缺的用 options["panel.<id>"] ?? defaultOn 補 → $.store.set
+  ├─ panels ← $.store.get("panels") ⊕ 缺的用 options["panel_<id>"] ?? defaultOn 補 → $.store.set
   ├─ $.command.register({ name: "telltale", description, argumentHint: "[status|help|on|off|<panel> [on|off]]" })
   └─ 每個有 poll 的面板：tick = async () => {
          try {

@@ -41,13 +41,13 @@ const render = (
 
 // ── session.start ──
 test("session.start seeds panels from options / defaultOn and registers /telltale", async () => {
-  const eng = await boot({ options: { "panel.hello": false } });
+  const eng = await boot({ options: { "panel_hello": false } });
   expect(eng.store.panels).toEqual({ hello: false, clock: true });
   expect(eng.registered).toEqual(["telltale"]);
 });
 
 test("session.start keeps existing store toggles over options (store is the truth)", async () => {
-  const eng = await boot({ store: { panels: { hello: true, clock: false } }, options: { "panel.hello": false } });
+  const eng = await boot({ store: { panels: { hello: true, clock: false } }, options: { "panel_hello": false } });
   expect(eng.store.panels).toEqual({ hello: true, clock: false });
 });
 
