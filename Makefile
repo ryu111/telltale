@@ -14,6 +14,8 @@ check:
 	$(PY) pytest -n $(WORKERS) --dist load tests/單元
 	@# plugin 本體：bun 對「沒有任何 *.test.ts」回 1，所以先 find 再跑，零測試檔不算紅
 	@if find hooks -name '*.test.ts*' 2>/dev/null | grep -q .; then bun test hooks/; else echo "bun test: no test files under hooks/ yet"; fi
+	CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin validate --strict .
+
 
 # 一張已核准的票從派工走到 merge（scripts/跑票.py）：停下來就印 JSON 報告、退出碼 3。
 ticket:
