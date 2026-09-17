@@ -22,7 +22,7 @@ const ALLOWED = [
   "$.store.set",
   "$.command.register",
 ];
-const ALLOWED_V02 = [...ALLOWED, "$.agent.list", "$.env.get"]; // + $.ui.open / $.ui.close once ticket 16 lands
+const ALLOWED_V02 = [...ALLOWED, "$.agent.list", "$.env.get", "$.ui.open"]; // ticket 16 landed; $.ui.close still unused
 
 type Opts = Parameters<typeof fakeEngine>[0];
 

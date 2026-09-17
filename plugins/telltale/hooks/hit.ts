@@ -69,3 +69,20 @@ export const isClick = (down: { x: number; y: number } | null, ev: { type: strin
   if (!down) return false;
   return ev.type === "up" && ev.x === down.x && ev.y === down.y;
 };
+
+// Ticket 16: which cell (of the `agents` panel's `kind: "cells"` view, once
+// ticket 17 wires it up) a click at row `y` lands in — one entry per cell,
+// `rows` is how many rows `band.tsx` gave that cell (its own title/border
+// rows included). Rows outside every cell's span (padding, or a panel with
+// no cells) return null.
+export type CellRowSpan = { cellId: string; rows: number };
+
+export const hitCell = (y: number, x: number, cellRowsStartY: number, spans: readonly CellRowSpan[], columns: number): string | null => {
+  if (x < 0 || x >= columns || y < cellRowsStartY) return null;
+  let cursor = cellRowsStartY;
+  for (const span of spans) {
+    if (y >= cursor && y < cursor + span.rows) return span.cellId;
+    cursor += span.rows;
+  }
+  return null;
+};

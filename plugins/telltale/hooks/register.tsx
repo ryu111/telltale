@@ -42,6 +42,64 @@ const isStageMessage = (data: unknown): data is StageMessage =>
 
 const stagesOf = (p: Panel): Stages | undefined => p.stages;
 
+// Ticket 16: shared by both `ui.render` sites (AbovePrompt and Pane) —
+// the same `props` algorithm regardless of which surface ends up drawing
+// it, only `maxRows`/`viewport.columns` differ per call site. A top-level
+// function declaration, not a closure inside `registerHooks`: `claude
+// plugin validate --strict` only follows `$` into a function named at the
+// top of this file (see `registerHooks`'s own comment on the same rule),
+// so `active` is threaded in as a parameter instead of being read from a
+// closure.
+// `$`'s exact type is whatever the caller's own hook parameter infers to
+// (AbovePrompt's and Pane's differ only in fields this function never
+// touches, plus there's no `tsc` step in this repo's checks — see
+// 00-共同規則); left as `any` rather than re-deriving a shared alias.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function buildBandProps(active: readonly Panel[], $: any, maxRows: number, viewportColumns: number | undefined): Promise<BandProps> {
+  const byId = new Map(active.map((p) => [p.id, p] as const));
+  const panelsState = ((await $.store.get("panels")) as Record<string, boolean> | undefined) ?? {};
+  const wants = await Promise.all(
+    active
+      .filter((p) => panelsState[p.id] ?? p.defaultOn)
+      .map(async (p) => {
+        if (!stagesOf(p)) return { id: p.id, minRows: p.minRows, wantRows: p.wantRows };
+        const stage = ((await $.store.get(`size.${p.id}`)) as Stage | undefined) ?? "compact";
+        const { minRows, wantRows } = rowsForStage(stage);
+        return { id: p.id, minRows, wantRows };
+      }),
+  );
+
+  const { slots, dropped, total } = layout(wants, maxRows);
+  const columnsForView = Math.max(MIN_COLUMNS, viewportColumns ?? 80);
+  const now = await $.clock.now();
+
+  const bandPanels = await Promise.all(
+    slots.map(async (slot) => {
+      const p = byId.get(slot.id)!;
+      const cached = (await $.store.get(`data.${p.id}`)) as { at: number; data: unknown } | undefined;
+      const error = ((await $.store.get(`error.${p.id}`)) as string | undefined) ?? "";
+      const view = p.view(cached?.data, columnsForView, slot.rows);
+      return {
+        id: p.id,
+        label: p.label,
+        rows: slot.rows,
+        lines: view.lines,
+        at: cached?.at ?? null,
+        error: error === "" ? null : error,
+        stages: Boolean(stagesOf(p)),
+      };
+    }),
+  );
+
+  return {
+            columnsHint: viewportColumns ?? 80,
+            total,
+            panels: bandPanels,
+            dropped,
+            now,
+          } satisfies BandProps;
+}
+
 // Ticket 13 §2.7: hello/clock are dev-only scaffolding, gated behind
 // `TELLTALE_DEV=1`. A panel doesn't know this about itself (framework
 // policy, not panel data) — see `Panel<D>` in panel.ts, which has no such flag.
@@ -92,6 +150,15 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
       description: "Toggle panels, or show what the band is doing",
       argumentHint: "[status|help|on|off|<panel> [on|off]]",
     });
+
+    // Ticket 16 (DESIGN §6 item 4 / SDD §2.5): ask the engine to open a Pane
+    // for the band once the agents panel is live, so the same `Band` Client
+    // can be dock-placed (≥ some width) instead of always sitting above the
+    // prompt. The engine — not this plugin — decides which of the two
+    // `ui.render` sites below actually draws (Pane docked vs. AbovePrompt).
+    if (active.some((p) => p.id === "agents")) {
+      await $.ui.open({ id: "telltale", title: "telltale" });
+    }
 
     for (const p of active) {
       if (!p.poll) continue;
@@ -147,57 +214,27 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
   on("ui.render", { component: "AbovePrompt" }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e);
 
-    const panelsState = ((await $.store.get("panels")) as Record<string, boolean> | undefined) ?? {};
-    const wants = await Promise.all(
-      active
-        .filter((p) => panelsState[p.id] ?? p.defaultOn)
-        .map(async (p) => {
-          if (!stagesOf(p)) return { id: p.id, minRows: p.minRows, wantRows: p.wantRows };
-          const stage = ((await $.store.get(`size.${p.id}`)) as Stage | undefined) ?? "compact";
-          const { minRows, wantRows } = rowsForStage(stage);
-          return { id: p.id, minRows, wantRows };
-        }),
-    );
-
-    const { slots, dropped, total } = layout(wants, e.props.maxRows as number);
     const viewportColumns = (e.viewport as { columns?: number } | undefined)?.columns;
-    const columnsForView = Math.max(MIN_COLUMNS, viewportColumns ?? 80);
-    const now = await $.clock.now();
-
-    const bandPanels = await Promise.all(
-      slots.map(async (slot) => {
-        const p = byId().get(slot.id)!;
-        const cached = (await $.store.get(`data.${p.id}`)) as { at: number; data: unknown } | undefined;
-        const error = ((await $.store.get(`error.${p.id}`)) as string | undefined) ?? "";
-        const view = p.view(cached?.data, columnsForView, slot.rows);
-        return {
-          id: p.id,
-          label: p.label,
-          rows: slot.rows,
-          lines: view.lines,
-          at: cached?.at ?? null,
-          error: error === "" ? null : error,
-          stages: Boolean(stagesOf(p)),
-        };
-      }),
-    );
+    const props = await buildBandProps(active, $, e.props.maxRows as number, viewportColumns);
 
     const { Client } = $.ui.resolve(e);
-    return (
-      <Client
-        key="band"
-        module="./band.tsx"
-        props={
-          {
-            columnsHint: viewportColumns ?? 80,
-            total,
-            panels: bandPanels,
-            dropped,
-            now,
-          } satisfies BandProps
-        }
-      />
-    );
+    return <Client key="band" module="./band.tsx" props={props} />;
+  });
+
+  // Ticket 16: the docked-Pane path (SDD §2.5 / DESIGN §6 item 4). The
+  // engine gives a Pane's body its own `bodyColumns`, not the terminal
+  // width — read from `e.viewport.columns` the same way AbovePrompt does;
+  // `claude-code.d.ts`'s `Pane` documents this as what a `ui.render` for
+  // `{ component: "Pane" }` receives. No `maxRows` ceiling from the engine
+  // here (a Pane isn't sharing rows with the transcript the way AbovePrompt
+  // shares them with the prompt), so this uses the same `BAND_ROWS_MAX`
+  // ceiling `command.run` already uses when it has no live viewport either.
+  on("ui.render", { component: "Pane" }, async ($, e) => {
+    const viewportColumns = (e.viewport as { columns?: number } | undefined)?.columns;
+    const props = await buildBandProps(active, $, BAND_ROWS_MAX, viewportColumns);
+
+    const { Client } = $.ui.resolve(e);
+    return <Client key="band" module="./band.tsx" props={props} />;
   });
 
   on("ui.message", async ($, e, next) => {
