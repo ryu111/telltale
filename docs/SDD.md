@@ -105,23 +105,26 @@ export type Panel<D> = { ...第一輪欄位...; needsAgents?: boolean; stages?: 
 
 ```ts
 export const BAND_ROWS_MAX = 9;          // 唯一來源；標題 1 + 內容 + 狀態 1
-export const FIXED_ROWS = 2;             // 標題列 + 狀態列
-export const CONTENT_ROWS_MAX = BAND_ROWS_MAX - FIXED_ROWS;   // 不另寫數字
+export const TITLE_ROWS = 1;             // 標題列，永遠在（票 23）
+export const STATUS_ROWS = 1;            // 狀態列，有事才在（票 23，使用者 2026-09-18 裁定）
+export const FIXED_ROWS = TITLE_ROWS + STATUS_ROWS;   // 狀態列出現時的固定列數
+export const CONTENT_ROWS_MAX = BAND_ROWS_MAX - TITLE_ROWS;   // 不另寫數字；沒有狀態列時內容最多幾列
 export const MIN_COLUMNS = 20;           // 窄於這個，整條帶只畫一列（§1.5）
 
 export type Want = { id: string; minRows: number; wantRows: number };
 export type Slot = { id: string; rows: number };
-export type Layout = { slots: Slot[]; dropped: string[]; total: number };
+export type Layout = { slots: Slot[]; dropped: string[]; total: number; status: boolean };
 
-export const layout = (panels: readonly Want[], maxRows: number): Layout;
+export const layout = (panels: readonly Want[], maxRows: number, opts?: { status?: boolean }): Layout;
 ```
 
 規則（每條都有測試與突變）：
-1. `budget = min(maxRows, BAND_ROWS_MAX) - FIXED_ROWS`，**算一次、是常數**，不隨分配遞減後重判。
+0. （票 23）固定列數 `fixed`：`opts.status`（框架在有面板 `error` 時傳 true）→ `FIXED_ROWS`；否則先用 `TITLE_ROWS` 算一次，**有任何面板進 `dropped` 就改用 `FIXED_ROWS` 重算一次**（狀態列要印被砍的面板）。回傳的 `status` = 這次有沒有狀態列。
+1. `budget = min(maxRows, BAND_ROWS_MAX) - fixed`，**算一次、是常數**，不隨分配遞減後重判。
 2. `budget < 1`（含 `maxRows ≤ FIXED_ROWS`、`maxRows ≤ 0`）：`slots = []`、全部進 `dropped`、`total = max(1, min(maxRows, FIXED_ROWS))`。`total === 1` 時 band 把標題與狀態合併成一列（§1.5）。
 3. 依 `panels` 順序，每個面板先拿 `PANEL_TITLE_ROWS (=1) + minRows`（從 `budget` 扣；那一列是 §1.5 的 `─ label ─` 標題列，**票 06 實測漏算過，狀態列蓋掉了 clock 的標題**）；扣不起的整個進 `dropped`，**不畫半個**，繼續看下一個（後面較小的面板仍可能塞進去）。
 4. 第一輪分完剩下的列，再依順序補到各面板的 `wantRows` 為止；補不完就留白（`total` 可以小於上限，用 `≤` 不用 `=`）。
-5. `total = FIXED_ROWS + Σ (PANEL_TITLE_ROWS + slots.rows) ≤ min(maxRows, BAND_ROWS_MAX)`（規則 2 的情況除外，那時 `total ≤ FIXED_ROWS`）。`slot.rows` 是內容列數，不含標題列。
+5. `total = (status ? FIXED_ROWS : TITLE_ROWS) + Σ (PANEL_TITLE_ROWS + slots.rows) ≤ min(maxRows, BAND_ROWS_MAX)`（規則 2 的情況除外，那時 `total ≤ FIXED_ROWS`）。`slot.rows` 是內容列數，不含標題列。
 6. 輸出確定：同輸入同輸出；`slots` 順序 = 輸入順序；`dropped` 順序 = 輸入順序。
 7. `layout` **不吃 columns**：寬度改變永遠不改變高度。帶子高度只在「maxRows 變」或「開關變」時變（回答使用者「resize 時高度跳動」的顧慮）。
 
@@ -175,7 +178,7 @@ export function Band(props: BandProps, surface: ClientSurface<BandState>): Rende
 - `props.total === 1`：標題與狀態合併成一列。
 - 第 1 列（標題列）：`fit(text, columns - TITLE_RESERVE)`，`TITLE_RESERVE = 4` = 引擎 `[-]` 蓋掉的 3 欄 + 1 欄緩衝（**兩個數字都寫成常數並註解，別「修正」成 3**）。最右 4 欄留白。
 - 每個面板：一列標題 `─ label ─────`（用 `─` 補到 columns），然後 `lines`，每行 `fit(text, columns)`。
-- 末列（狀態列）：`dropped` 非空 → `⋯ git, trace not shown (height)`；有面板 `error` → `hello: data too large`；否則 `updated Ns ago`，N = `now - max(panels[].at)`（顯示中最新的那個）。
+- 末列（狀態列）：**只在 `props.status` 為 true 時存在**（票 23）：`dropped` 非空 → `⋯ git, trace not shown (height)`；有面板 `error` → `hello: data too large`。沒事就沒有這一列（那一列還給面板內容；原本的 `updated Ns ago` 在 agents 每秒 poll 下永遠是 0s，拿掉）。
 - `tone` → 顏色：`up` 綠、`down` 紅、`flat` 預設色、`dim` dimColor。只表達嚴重度，不閃、不加粗（題目 §7.4）。
 - **每次呼叫都重掛 `surface.onPointer`**（回呼裡只讀 `surface.state`、不讀閉包）。點擊 = `down` 後同一格 `up`；落在某面板標題列且 `x < columns - TITLE_RESERVE` → `surface.post({ kind: "toggle", id })`。最右 4 欄是死區（README 寫明）。hover 不做。
 - **這個檔的輸出沒有自動測試守著**（Client 在繪製執行緒）；命中判定 `hitPanel(y, panels): string | null` 抽到 `hooks/hit.ts` 純函式去測（列數從 `props.total` 與各 `rows` 算，跟畫的用同一個函式 `rowsOf(props)`，不許兩份）。
@@ -368,7 +371,7 @@ v0.2 追加：fakeEngine 多 `agents: AgentInfo[]`（`$.agent.list` 回它的副
 |---|---|---|
 | I1 | `validate --strict` exit 0，`calls:` 恰好 = §1.4 那七個 | `make check` 跑 validate 並 diff 那一行；每個 op 在流程測試裡 `calls[op] ≥ 1` |
 | I2 | `layout()` 的 `total ≤ min(maxRows, BAND_ROWS_MAX)`，且每個 slot `rows ≥ minRows` | 單元測試（含 budget<1、混合 dropped、`maxRows=1`、`maxRows=0`）+ 突變 `Math.min(maxRows, BAND_ROWS_MAX)` → `maxRows` |
-| I3 | 被砍的面板出現在 `dropped`，且狀態列印出來 | 單元測試 + 突變 `dropped` 清空 |
+| I3 | 被砍的面板出現在 `dropped`，且狀態列印出來；沒 dropped 也沒 error 時**沒有**狀態列（票 23） | 單元測試 + 突變 `dropped` 清空、`status` 永遠 true |
 | I4 | 傳給 `Client` 的每一行 `displayWidth ≤ columns`；中文算 2；**而且** `displayWidth ≤ columns` 的字串 `fit` 後原樣 | 單元測試（columns 30 塞中文；恰好等寬的不動）+ 突變 `wide ? 2 : 1` → `1`、`fit` 多扣 1 |
 | I5 | `$.store` 總量 < 4 MiB：`data.<id>` 寫入前 `JSON.stringify` 長度 > 64 KiB 就不寫、寫 `error.<id>`；下次成功就清 | 流程測試用假面板回 70 KiB 走過這條路徑（不是只測工具函式） |
 | I6 | 重複 poll 無害：同一 `data.<id>` 寫兩次結果一樣 | hello 的 poll 是純的；規約寫在 Panel 契約 |
