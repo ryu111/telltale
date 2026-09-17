@@ -14,19 +14,5 @@
     "tui",
     "terminal",
     "status-band"
-  ],
-  "userConfig": {
-    "panel_hello": {
-      "type": "boolean",
-      "title": "Hello panel",
-      "description": "Show the hello panel",
-      "default": true
-    },
-    "panel_clock": {
-      "type": "boolean",
-      "title": "Clock panel",
-      "description": "Show the clock panel",
-      "default": true
-    }
-  }
+  ]
 }
