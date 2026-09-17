@@ -49,7 +49,7 @@ When both are present for the same plugin name, `--plugin-dir` wins. Tested on C
 Pasted verbatim from `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin validate --strict plugins/telltale` (run at the repo root) — this is the whole static surface telltale is allowed to reach:
 
 ```text
-register.tsx hooks: session.start, ui.render{component=AbovePrompt}, ui.message, command.run{command=telltale}
+register.tsx hooks: session.start, ui.render{component=AbovePrompt}, ui.message, command.run{command=telltale}, turn.start, turn.step, turn.complete, ui.render{component=Spinner}, session.receive{origin has {kind=task-notification}}
 register.tsx calls: $.clock.every, $.clock.now, $.command.register, $.store.get, $.store.set, $.ui.invalidate, $.ui.resolve
 ```
 

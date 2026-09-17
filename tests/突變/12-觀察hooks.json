@@ -1,0 +1,26 @@
+[
+  {
+    "label": "turn.step: toolUses read before next resolves",
+    "file": "plugins/telltale/hooks/register.tsx",
+    "old": "const result = yield* next(e);",
+    "new": "const result = { ...e, toolUses: [] } as { toolUses: readonly { name: string; input: unknown }[] };"
+  },
+  {
+    "label": "turn.complete: sub loop double-closes",
+    "file": "plugins/telltale/hooks/observe.ts",
+    "old": "if (e.agentId) return cells;",
+    "new": "if (false) return cells;"
+  },
+  {
+    "label": "spinner: tool-use counted as thinking",
+    "file": "plugins/telltale/hooks/observe.ts",
+    "old": "const THINKING_MODES = new Set([\"responding\", \"thinking\", \"requesting\"]);",
+    "new": "const THINKING_MODES = new Set([\"responding\", \"thinking\", \"requesting\", \"tool-use\"]);"
+  },
+  {
+    "label": "session.receive: hooks does not return next's result",
+    "file": "plugins/telltale/hooks/register.tsx",
+    "old": "    const passed = (await next(e)) as { text?: string };\n    return { text: passed.text ?? input.text };",
+    "new": "    return { text: input.text };"
+  }
+]

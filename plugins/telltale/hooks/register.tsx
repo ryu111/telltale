@@ -7,6 +7,15 @@ import { runTelltale, type TelltaleState } from "./command";
 import { BAND_ROWS_MAX, layout, MIN_COLUMNS, nextStage, rowsForStage, type Stage, type Stages } from "./layout";
 import type { BandPanel, BandProps } from "./hit";
 import type { Panel } from "./panel";
+import {
+  applySpinner,
+  applyTaskNotification,
+  applyTurnComplete,
+  applyTurnStart,
+  applyTurnStep,
+  type Cells,
+  type PendingSpawn,
+} from "./observe";
 
 // The band's props are owned by hit.ts (pure); re-exported here so tests and band.tsx share one shape.
 export type { BandPanel, BandProps };
@@ -44,6 +53,18 @@ const stagesOf = (p: Panel): Stages | undefined => (p as { stages?: Stages }).st
 // below just forward into it with a different `panels` list.
 const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions): void => {
   const byId = new Map(panels.map((p) => [p.id, p] as const));
+
+  // Ticket 12 §2.6a: spawns seen via turn.step's Agent tool uses, kept in
+  // memory (not `$.store` — SDD §2.6) until ticket 13's poll pairs them up
+  // against `$.agent.list()`. Not consumed by this ticket; `takePending` is
+  // declared here for ticket 13 to wire in.
+  let pendingSpawns: PendingSpawn[] = [];
+  const takePending = (): PendingSpawn[] => {
+    const out = pendingSpawns;
+    pendingSpawns = [];
+    return out;
+  };
+  void takePending;
 
   on("session.start", async ($, e, next) => {
     const existing = (await $.store.get("panels")) as Record<string, boolean> | undefined;
@@ -211,6 +232,78 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
       $.ui.invalidate("ui.render");
     }
     return { text: result.text };
+  });
+
+  // Ticket 12: observation-only hooks writing `agents.cells` (SDD §2.6/§2.6a).
+  // None of these change what the model or the user sees (I13) — each reads
+  // the store, applies a pure `observe.ts` function, writes it back, and
+  // (except Spinner, which never invalidates) invalidates the render.
+
+  on("turn.start", async ($, e, next) => {
+    const input = e as { turnId: string; text: string };
+    const cells = ((await $.store.get("agents.cells")) as Cells | undefined) ?? {};
+    await $.store.set("agents.cells", applyTurnStart(cells, input, await $.clock.now()));
+    $.ui.invalidate("ui.render");
+    return next(e);
+  });
+
+  // turn.step is the one streaming event (claude-code.d.ts `StreamingEventName`):
+  // `validate --strict` refuses a plain async function here — "turn.step
+  // streams, so it takes async function* ($, e, next)". `yield* next(e)`
+  // both passes every chunk through unread and evaluates to the whole
+  // response once the stream ends, so it plays the same role the ticket's
+  // "await next(e) first, use the result" plan does for a non-streaming hook.
+  on("turn.step", async function* ($, e, next) {
+    // Type pitfall (see 12-觀察hooks.md): `toolUses` lives on next(e)'s
+    // RESULT, not on the input `e` — so next(e) is drained first.
+    const result = yield* next(e);
+    const input = e as { turnId: string; agentId?: string };
+    const stepResult = result as { toolUses: readonly { name: string; input: unknown }[] };
+    const cells = ((await $.store.get("agents.cells")) as Cells | undefined) ?? {};
+    const { cells: updated, pending } = applyTurnStep(
+      cells,
+      { turnId: input.turnId, agentId: input.agentId, toolUses: stepResult.toolUses },
+      await $.clock.now(),
+    );
+    await $.store.set("agents.cells", updated);
+    pendingSpawns.push(...pending);
+    $.ui.invalidate("ui.render");
+    return result;
+  });
+
+  on("turn.complete", async ($, e, next) => {
+    const input = e as { turnId: string; agentId?: string };
+    const cells = ((await $.store.get("agents.cells")) as Cells | undefined) ?? {};
+    await $.store.set("agents.cells", applyTurnComplete(cells, input, await $.clock.now()));
+    $.ui.invalidate("ui.render");
+    return next(e);
+  });
+
+  on("ui.render", { component: "Spinner" }, async ($, e, next) => {
+    const input = e as { requestId: string; props: { mode: string } };
+    const cells = ((await $.store.get("agents.cells")) as Cells | undefined) ?? {};
+    const updated = applySpinner(
+      cells,
+      { requestId: input.requestId, mode: input.props.mode },
+      await $.clock.now(),
+    );
+    await $.store.set("agents.cells", updated);
+    // Spinner is the one hook here that never invalidates (DESIGN's breathe/
+    // marquee redraw on their own clocks; a spinner tick alone isn't news).
+    return next(e);
+  });
+
+  // Type pitfall 2 (see 12-觀察hooks.md): the matcher's `origin` is an
+  // object `{ kind }`, not a bare string.
+  on("session.receive", { origin: { kind: "task-notification" } }, async ($, e, next) => {
+    const input = e as { text: string };
+    const cells = ((await $.store.get("agents.cells")) as Cells | undefined) ?? {};
+    await $.store.set("agents.cells", applyTaskNotification(cells, input.text, await $.clock.now()));
+    $.ui.invalidate("ui.render");
+    // What this (or a downstream) hook returns and what next(e) resolves to
+    // is the delivery's `{ text }`; pass a rewrite down, keep an unchanged one.
+    const passed = (await next(e)) as { text?: string };
+    return { text: passed.text ?? input.text };
   });
 };
 

@@ -38,13 +38,37 @@ const roundTrip = <T,>(value: T): T => (value === undefined ? value : (JSON.pars
 
 type Matcher = Record<string, unknown> | undefined;
 type Next = (e: Record<string, unknown>) => Promise<unknown>;
-type Hook = ($: FakeDollar, e: Record<string, unknown>, next: Next) => unknown;
+// `turn.step` is claude-code's one streaming event (claude-code.d.ts
+// `StreamingEventName`): its hooks are `async function*`, and `next(e)`
+// is a fresh stream (an async generator), not a Promise — `yield* next(e)`
+// both forwards every chunk and evaluates to what the stream returns.
+// This harness never models chunks (no test needs one), so `next(e)`'s
+// generator yields nothing and just returns the (possibly overridden) result.
+type StreamNext = (e: Record<string, unknown>) => AsyncGenerator<unknown, unknown>;
+type StreamHook = ($: FakeDollar, e: Record<string, unknown>, next: StreamNext) => AsyncGenerator<unknown, unknown>;
+type Hook = (($: FakeDollar, e: Record<string, unknown>, next: Next) => unknown) | StreamHook;
 type OnFn = (pattern: string, matcherOrHook: Matcher | Hook, maybeHook?: Hook) => unknown;
+
+// Ticket 12's harness 擴充: a minimal structural stand-in for claude-code's
+// `AgentInfo` (id/description/type/status + the optional pairing fields),
+// spelled out locally so this file doesn't need the (untracked, per-session
+// generated) claude-code.d.ts to exist for `bun test` to run.
+export type FakeAgentInfo = {
+  id: string;
+  description: string;
+  type: string;
+  status: string;
+  parentId?: string;
+  spawnedBy?: string;
+  name?: string;
+};
 
 export type FakeDollar = {
   ui: {
     resolve: (e?: unknown) => typeof ELEMENTS;
     invalidate: (scope?: string) => void;
+    open: (args: Record<string, unknown>) => void;
+    close: (id: string) => void;
   };
   clock: {
     now: () => number;
@@ -57,12 +81,20 @@ export type FakeDollar = {
   command: {
     register: (spec: { name: string; description?: string; argumentHint?: string }) => Promise<{ command: string }>;
   };
+  agent: {
+    list: () => Promise<FakeAgentInfo[]>;
+  };
+  env: {
+    get: (name: string) => string | undefined;
+  };
 };
 
 export type FakeEngineOpts = {
   store?: Record<string, unknown>;
   now?: number;
   options?: Record<string, unknown>;
+  env?: Record<string, string>;
+  agents?: FakeAgentInfo[];
 };
 
 export type FakeEngine = {
@@ -77,6 +109,10 @@ export type FakeEngine = {
   tick: (id: string) => Promise<void>;
   now: number;
   NEXT_RENDER: typeof NEXT_RENDER;
+  opened: string[];
+  // Ticket 12: the next `fire(event, e)`'s `next(e)` resolves to `value`
+  // instead of the default stub, consumed once.
+  setNextResult: (event: string, value: unknown) => void;
 };
 
 export const fakeEngine = (opts: FakeEngineOpts = {}): FakeEngine => {
@@ -84,6 +120,10 @@ export const fakeEngine = (opts: FakeEngineOpts = {}): FakeEngine => {
   const calls: Record<string, number> = {};
   const registered: string[] = [];
   const timers: { ms: number; fn: () => unknown }[] = [];
+  const opened: string[] = [];
+  const env: Record<string, string> = { ...(opts.env ?? {}) };
+  const agents: FakeAgentInfo[] = (opts.agents ?? []).map((a) => ({ ...a }));
+  let nextOverride: { event: string; value: unknown } | undefined;
   // Keyed by the tick function's `.name`: register.tsx names each panel's
   // tick closure after the panel id (SDD §3), so `tick(id)` can find it
   // without the harness needing to know about panels at all.
@@ -104,6 +144,15 @@ export const fakeEngine = (opts: FakeEngineOpts = {}): FakeEngine => {
       invalidate: () => {
         bump("$.ui.invalidate");
         state.invalidations += 1;
+      },
+      open: (args) => {
+        bump("$.ui.open");
+        const id = (args as { id?: unknown }).id;
+        opened.push(typeof id === "string" ? id : JSON.stringify(args));
+      },
+      close: (id) => {
+        bump("$.ui.close");
+        opened.splice(opened.indexOf(id), 1);
       },
     },
     clock: {
@@ -135,6 +184,18 @@ export const fakeEngine = (opts: FakeEngineOpts = {}): FakeEngine => {
         return { command: spec.name };
       },
     },
+    agent: {
+      list: async () => {
+        bump("$.agent.list");
+        return agents.map((a) => ({ ...a }));
+      },
+    },
+    env: {
+      get: (name) => {
+        bump("$.env.get");
+        return env[name];
+      },
+    },
   };
 
   const on: OnFn = (pattern, matcherOrHook, maybeHook) => {
@@ -144,11 +205,52 @@ export const fakeEngine = (opts: FakeEngineOpts = {}): FakeEngine => {
     return {};
   };
 
-  const matches = (matcher: Matcher, e: Record<string, unknown>): boolean =>
-    !matcher || Object.entries(matcher).every(([key, value]) => e[key] === value);
+  // Nested partial match: an object matcher value recurses into the same
+  // key of `e` (claude-code's real `Matcher` allows
+  // `{ origin: { kind: "task-notification" } }`); any other value is `===`.
+  const matches = (matcher: Matcher, e: Record<string, unknown>): boolean => {
+    if (!matcher) return true;
+    return Object.entries(matcher).every(([key, value]) => {
+      const actual = e[key];
+      if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+        if (actual === null || typeof actual !== "object" || Array.isArray(actual)) return false;
+        return matches(value as Record<string, unknown>, actual as Record<string, unknown>);
+      }
+      return actual === value;
+    });
+  };
+
+  const setNextResult = (event: string, value: unknown): void => {
+    nextOverride = { event, value };
+  };
+
+  const consumeOverride = (event: string): { hit: boolean; value: unknown } => {
+    if (nextOverride && nextOverride.event === event) {
+      const { value } = nextOverride;
+      nextOverride = undefined;
+      return { hit: true, value };
+    }
+    return { hit: false, value: undefined };
+  };
 
   const fire = async (event: string, e: Record<string, unknown>): Promise<unknown> => {
-    const next: Next = async () => (event === "ui.render" ? NEXT_RENDER : {});
+    if (event === "turn.step") {
+      const streamNext: StreamNext = async function* () {
+        const { hit, value } = consumeOverride("turn.step");
+        return hit ? value : {};
+      };
+      const entry = (handlers[event] ?? []).find((candidate) => matches(candidate.matcher, e));
+      const gen = entry ? (entry.hook as StreamHook)($, e, streamNext) : streamNext(e);
+      let step = await gen.next();
+      while (!step.done) step = await gen.next();
+      return step.value;
+    }
+
+    const next: Next = async () => {
+      const { hit, value } = consumeOverride(event);
+      if (hit) return value;
+      return event === "ui.render" ? NEXT_RENDER : {};
+    };
     const entry = (handlers[event] ?? []).find((candidate) => matches(candidate.matcher, e));
     if (!entry) return next(e);
     return entry.hook($, e, next);
@@ -160,7 +262,7 @@ export const fakeEngine = (opts: FakeEngineOpts = {}): FakeEngine => {
     await fn();
   };
 
-  const eng = { on, $, fire, store, calls, registered, timers, tick, NEXT_RENDER } as FakeEngine;
+  const eng = { on, $, fire, store, calls, registered, timers, tick, NEXT_RENDER, opened, setNextResult } as FakeEngine;
   Object.defineProperty(eng, "now", {
     get: () => state.now,
     set: (value: number) => {
