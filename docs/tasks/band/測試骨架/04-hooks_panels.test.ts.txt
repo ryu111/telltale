@@ -78,10 +78,14 @@ test("every panel line fits the columns it was given (CJK counts 2) and rows are
     for (const cols of [20, 30, 45, 80]) {
       for (const rows of [p.minRows, p.wantRows]) {
         for (const data of [undefined, samples[p.id]]) {
-          const v = p.view(data, cols, rows);
-          expect(v.lines.length).toBeLessThanOrEqual(rows);
-          expect(v.lines.length).toBeGreaterThanOrEqual(1);
-          for (const l of v.lines) expect(displayWidth(l.text)).toBeLessThanOrEqual(cols);
+          const v = p.view(data, cols, rows) as { lines?: { text: string }[]; kind?: string; cells?: unknown[] };
+          if (v.kind === "cells") { // v0.2: a cells panel hands rows to renderCell (I4 is guarded in cells-render tests)
+            expect(Array.isArray(v.cells)).toBe(true);
+            continue;
+          }
+          expect(v.lines!.length).toBeLessThanOrEqual(rows);
+          expect(v.lines!.length).toBeGreaterThanOrEqual(1);
+          for (const l of v.lines!) expect(displayWidth(l.text)).toBeLessThanOrEqual(cols);
         }
       }
     }

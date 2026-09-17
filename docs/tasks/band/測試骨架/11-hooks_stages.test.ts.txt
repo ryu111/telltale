@@ -1,4 +1,5 @@
 // Ticket 11: stages (§1.2 rule 8) + size.<id> + title-click cycles through stages.
+// Fixture panel id is "demo": a generic staged panel. The real "agents" panel has its own `/telltale agents size` format (ticket 17).
 // SDD §1.2 rule 8, §1.5 v0.2, §1.6 v0.2, §2.1 v0.2. Evaluation: exact match.
 import { expect, test } from "bun:test";
 import { clientOf, fakeEngine } from "./harness";
@@ -17,7 +18,7 @@ test("rowsForStage: summary/compact/full map to the fixed (minRows, wantRows) pa
 
 test("rowsForStage: full still respects layout()'s own ceiling (I2) when wired through", () => {
   const { minRows, wantRows } = rowsForStage("full");
-  const r = layout([{ id: "agents", minRows, wantRows }], 5); // small maxRows: budget < wantRows
+  const r = layout([{ id: "demo", minRows, wantRows }], 5); // small maxRows: budget < wantRows
   expect(r.total).toBeLessThanOrEqual(5);
   expect(r.slots[0]?.rows ?? 0).toBeGreaterThanOrEqual(0);
 });
@@ -47,8 +48,8 @@ const bandProps = (panels: { id: string; stages?: boolean }[]): BandProps => ({
 });
 
 test("titleClickKind: a panel with stages:true posts \"stage\"", () => {
-  const props = bandProps([{ id: "agents", stages: true }]);
-  expect(titleClickKind("agents", props)).toBe("stage");
+  const props = bandProps([{ id: "demo", stages: true }]);
+  expect(titleClickKind("demo", props)).toBe("stage");
 });
 
 test("titleClickKind: hello/clock (no stages) post \"toggle\"", () => {
@@ -59,29 +60,29 @@ test("titleClickKind: hello/clock (no stages) post \"toggle\"", () => {
 
 // ── command.ts: runTelltale's `size` sub-command ──
 const stagedState = (sizes: Record<string, Stage> = {}): TelltaleState => ({
-  order: [{ id: "agents", label: "agents", stages: true }, { id: "hello", label: "hello" }],
-  panels: { agents: true, hello: true },
+  order: [{ id: "demo", label: "demo", stages: true }, { id: "hello", label: "hello" }],
+  panels: { demo: true, hello: true },
   sizes,
-  layout: { slots: [{ id: "agents", rows: 3 }, { id: "hello", rows: 1 }], dropped: [], total: 7 },
+  layout: { slots: [{ id: "demo", rows: 3 }, { id: "hello", rows: 1 }], dropped: [], total: 7 },
   available: 9,
 });
 
 test("runTelltale: `<id> size` with no value reports the current stage (default compact)", () => {
-  const r = runTelltale("agents size", stagedState());
-  expect(r.text).toBe("agents: size compact");
+  const r = runTelltale("demo size", stagedState());
+  expect(r.text).toBe("demo: size compact");
   expect(r.sizes).toEqual({});
 });
 
 test("runTelltale: `<id> size <stage>` sets it and reports the transition", () => {
-  const r = runTelltale("agents size full", stagedState());
-  expect(r.text).toBe("agents: size compact → full");
-  expect(r.sizes).toEqual({ agents: "full" });
+  const r = runTelltale("demo size full", stagedState());
+  expect(r.text).toBe("demo: size compact → full");
+  expect(r.sizes).toEqual({ demo: "full" });
 });
 
 test("runTelltale: `<id> size <stage>` unchanged reports (unchanged) and does not touch sizes identity", () => {
   const state = stagedState({ agents: "compact" });
-  const r = runTelltale("agents size compact", state);
-  expect(r.text).toBe("agents: size compact (unchanged)");
+  const r = runTelltale("demo size compact", state);
+  expect(r.text).toBe("demo: size compact (unchanged)");
   expect(r.sizes).toBe(state.sizes);
 });
 
@@ -91,42 +92,42 @@ test("runTelltale: `<id> size` on a panel without stages falls back to usage", (
 });
 
 test("runTelltale: `<id> size <garbage>` falls back to usage", () => {
-  const r = runTelltale("agents size huge", stagedState());
+  const r = runTelltale("demo size huge", stagedState());
   expect(r.text).toStartWith("usage:");
 });
 
-// ── same key, two paths: a title click and `/telltale agents size` write the same store slot ──
+// ── same key, two paths: a title click and `/telltale demo size` write the same store slot ──
 const stagedPanel = {
-  id: "agents",
-  label: "agents",
+  id: "demo",
+  label: "demo",
   defaultOn: true,
   minRows: 2,
   wantRows: 3,
   stages: { summary: 0, compact: 3, full: "rest" },
-  view: () => ({ id: "agents", lines: [] }),
+  view: () => ({ id: "demo", lines: [] }),
 } as unknown as Panel;
 
-test("clicking a title and running `/telltale agents size full` both write store key size.agents", async () => {
+test("clicking a title and running `/telltale demo size full` both write store key size.demo", async () => {
   const reg = makeRegister([stagedPanel]);
   const eng = fakeEngine({ store: { panels: { agents: true } } });
   reg(eng.on, {});
   await eng.fire("session.start", {});
 
   // path 1: default is compact (SDD §1.2 rule 8); two title clicks cycle compact -> full -> summary via ui.message
-  await eng.fire("ui.message", { data: { kind: "stage", id: "agents" } });
-  expect(eng.store["size.agents"]).toBe("full");
-  await eng.fire("ui.message", { data: { kind: "stage", id: "agents" } });
-  expect(eng.store["size.agents"]).toBe("summary");
+  await eng.fire("ui.message", { data: { kind: "stage", id: "demo" } });
+  expect(eng.store["size.demo"]).toBe("full");
+  await eng.fire("ui.message", { data: { kind: "stage", id: "demo" } });
+  expect(eng.store["size.demo"]).toBe("summary");
 
   // reset, path 2: the same transition via command.run
-  eng.store["size.agents"] = "compact";
-  await eng.fire("command.run", { command: "telltale", args: "agents size full" });
-  expect(eng.store["size.agents"]).toBe("full");
+  eng.store["size.demo"] = "compact";
+  await eng.fire("command.run", { command: "telltale", args: "demo size full" });
+  expect(eng.store["size.demo"]).toBe("full");
 });
 
 test("ui.render wants: a staged panel's minRows/wantRows follow size.<id>, not its static Panel fields", async () => {
   const reg = makeRegister([stagedPanel]);
-  const eng = fakeEngine({ store: { panels: { agents: true }, "size.agents": "full" } });
+  const eng = fakeEngine({ store: { panels: { agents: true }, "size.demo": "full" } });
   reg(eng.on, {});
   await eng.fire("session.start", {});
   const tree = await eng.fire("ui.render", {
@@ -140,7 +141,7 @@ test("ui.render wants: a staged panel's minRows/wantRows follow size.<id>, not i
   // row count is CONTENT_ROWS_MAX - PANEL_TITLE_ROWS (6), not its static Panel.wantRows (3).
   const client = clientOf(tree);
   const props = client!.props.props as { panels: { id: string; rows: number }[] }; // Client JSX attribute is literally `props`
-  expect(props.panels.find((p) => p.id === "agents")?.rows).toBe(CONTENT_ROWS_MAX - PANEL_TITLE_ROWS);
+  expect(props.panels.find((p) => p.id === "demo")?.rows).toBe(CONTENT_ROWS_MAX - PANEL_TITLE_ROWS);
 });
 
 test("ui.message stage on a non-staged panel id (hello) is ignored, not treated as toggle", async () => {
