@@ -47,9 +47,8 @@ class 假執行:
             self.已revert = True
         if a[:2] == ["git", "status"] and self.已revert:
             return 0, "", ""
-        if a[:3] == ["uv", "run", "pytest"]:
-            在主目錄 = cwd is not None and ".worktrees" not in str(cwd)
-            return (self.劇本["main_tests_rc"] if 在主目錄 else self._輪("wt_tests_rc")), "", ""
+        if a[:3] == ["uv", "run", "pytest"] or a[:2] == ["bun", "test"]:
+            return self._測試rc(cwd), "", ""
         固定: dict[tuple[str, ...], tuple[int, str, str]] = {
             ("git", "status"): (0, self.劇本["files"] if "--untracked-files=all" in a else "", ""),
             ("make", "check"): (self._輪("check_rc") if self.實作次數 else 0, "1 failed", ""),
@@ -58,6 +57,14 @@ class 假執行:
             ("git", "diff"): (0, "diff --git a/x b/x\n+class 沒這個工具(KeyError): ...\n", ""),
         }
         return 固定.get(tuple(a[:2]), (0, "", ""))
+
+    def _測試rc(self, cwd: Path | None) -> int:
+        """主目錄看 main_tests_rc；worktree 實作前看 紅檢查_rc、實作後看 wt_tests_rc。"""
+        if cwd is not None and ".worktrees" not in str(cwd):
+            return int(self.劇本["main_tests_rc"])
+        if not self.實作次數:  # 出題站：骨架搬進 worktree 後的紅檢查
+            return int(self.劇本.get("紅檢查_rc", 1))
+        return self._輪("wt_tests_rc")
 
     def _輪(self, 鍵: str) -> int:
         值 = self.劇本[鍵]
@@ -201,7 +208,7 @@ def test_審查另一家滿_第二次不指定家就過_merge(tmp_path: Path) ->
 def test_驗收測試檔不存在_前置站停_不跑pytest(tmp_path: Path) -> None:
     執, r, 碼 = _跑(tmp_path, {"沒測試檔": True})
     assert 碼 == 3 and r["station"] == "前置" and "不存在" in r["reason"]
-    assert "tests/單元 vs tests/流程" in r["reason"]
+    assert "測試骨架/" in r["reason"]
     assert not [a for a in 執.紀錄 if a[:3] == ["uv", "run", "pytest"]]
 
 
@@ -319,3 +326,65 @@ def test_審查prompt直接附diff_不叫它自己跑git(tmp_path: Path) -> None
 def test_截diff_太長會截並說明() -> None:
     出 = 跑票.截diff("x" * 20000, 上限=100)
     assert len(出) < 300 and "共 20000 字" in 出 and 跑票.截diff("短") == "短"
+
+
+def test_主線沒測試但有骨架_搬進worktree_出題commit_紅檢查在worktree(tmp_path: Path) -> None:
+    執, r, 碼 = _跑(tmp_path, {"沒測試檔": True, "骨架": "def test_a(): assert False\n"})
+    assert 碼 == 0, r
+    搬到 = tmp_path / ".worktrees/x-03-停止條件/tests/流程/test_迴圈.py"
+    assert 搬到.read_text(encoding="utf-8") == "def test_a(): assert False\n"
+    commit們 = [a for a in 執.紀錄 if a[:2] == ["git", "commit"]]
+    assert commit們 and "出題" in commit們[0][-1]
+    紅檢查 = [
+        (a, d)
+        for a, d in zip(執.紀錄, 執.目錄紀錄, strict=True)
+        if a[:3] == ["uv", "run", "pytest"]
+    ]
+    assert len(紅檢查) == 1 and ".worktrees" in str(紅檢查[0][1])  # 只在 worktree 跑，不在主線
+
+
+def test_主線沒測試也沒骨架_前置站停(tmp_path: Path) -> None:
+    _, r, 碼 = _跑(tmp_path, {"沒測試檔": True})
+    assert 碼 == 3 and r["station"] == "前置" and "沒有骨架" in r["reason"]
+
+
+def test_骨架搬進去就綠_出題站停(tmp_path: Path) -> None:
+    _, r, 碼 = _跑(tmp_path, {"沒測試檔": True, "骨架": "def test_a(): ...\n", "紅檢查_rc": 0})
+    assert 碼 == 3 and r["station"] == "出題" and "沒在測" in r["reason"]
+
+
+def test_ts驗收走bun_test_不走pytest(tmp_path: Path) -> None:
+    (tmp_path / "docs/tasks/x").mkdir(parents=True)
+    票檔 = tmp_path / "docs/tasks/x/02-layout.md"
+    票檔.write_text(
+        "# 02\n- 可碰檔案：`hooks/layout.ts`\n- 驗收測試：`hooks/layout.test.ts`\n",
+        encoding="utf-8",
+    )
+    骨架目錄 = tmp_path / "docs/tasks/x/測試骨架"
+    骨架目錄.mkdir()
+    (骨架目錄 / "02-hooks_layout.test.ts.txt").write_text(
+        "test('a', () => {});\n", encoding="utf-8"
+    )
+    對 = [{"test": "hooks/layout.test.ts", "definition": "§1.2"}]
+    執 = 假執行(
+        {
+            "files": " M hooks/layout.ts\n",
+            "main_tests_rc": 1,
+            "wt_tests_rc": 0,
+            "check_rc": 0,
+            "review": {"missing": [], "out_of_scope": [], "test_to_definition": 對},
+        }
+    )
+    跑票.跑票(票檔, tmp_path, 執, ["委派"], 輪數=2).全部()
+    bun們 = [a for a in 執.紀錄 if a[:2] == ["bun", "test"]]
+    assert bun們 == [
+        ["bun", "test", "hooks/layout.test.ts"]
+    ]  # 出題站紅檢查；驗收站由 make check 涵蓋
+    assert not [a for a in 執.紀錄 if a[:3] == ["uv", "run", "pytest"]]
+
+
+def test_分家() -> None:
+    assert 跑票.分家(["tests/a.py", "hooks/b.test.ts", "hooks/c.test.tsx"]) == (
+        ["tests/a.py"],
+        ["hooks/b.test.ts", "hooks/c.test.tsx"],
+    )

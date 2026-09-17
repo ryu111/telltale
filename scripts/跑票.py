@@ -3,9 +3,11 @@
 
     make ticket T=docs/tasks/<feature>/NN-<slug>.md
 
-站：前置（驗收測試在 main 上要紅）→ worktree → 委派實作（家 X）
+站：前置（主線已有的驗收測試要紅；主線沒有的要在 測試骨架/ 有一份）→ worktree
+  → 出題（骨架搬進 worktree、commit、在 worktree 看它紅）→ 委派實作（家 X）
   → 驗收（diff 對照可碰檔案、make check、驗收測試綠）→ 紅了用 --續接 再一輪（最多 --輪數）
   → 委派審查（另一家，Spec 軸）→ make mutate → merge、刪分支與 worktree。
+驗收測試 `.test.ts`／`.test.tsx` 走 `bun test`，其餘走 `uv run pytest`。
 
 退出碼：0 merge 了；3 停下來等人（報告說在哪站、為什麼）；1 基礎設施壞。
 stdout 最後一行是 JSON 報告。
@@ -31,7 +33,8 @@ from typing import Any
 執行器型 = Callable[[Sequence[str], Path | None], tuple[int, str, str]]
 結構目錄 = Path(__file__).resolve().parent / "schema"
 另一家 = {"codex": "agy", "agy": "codex"}
-_check涵蓋 = ("tests/單元", "tests/流程")
+_check涵蓋 = ("tests/單元", "tests/流程", "hooks/")  # make check 已跑這些目錄，驗收站不重跑
+_ts副檔名 = (".test.ts", ".test.tsx")  # 這些走 bun test；其餘走 pytest
 _pytest沒收到測試 = 5
 _pytest收集錯誤 = 2
 _pytest自己壞 = (3, 4)  # 內部錯誤、用法錯誤：不是紅，是題目或環境壞
@@ -77,6 +80,20 @@ def 欄位(票文字: str, 名: str) -> list[str]:
 def 範圍外(路徑們: Sequence[str], 可碰: Sequence[str]) -> list[str]:
     """整串比對，跟範圍 hook 一樣：`mutants/src/x.py` 不會被 `src/x.py` 放行。"""
     return [p for p in 路徑們 if not any(fnmatchcase(p, g) for g in 可碰)]
+
+
+def 分家(路徑們: Sequence[str]) -> tuple[list[str], list[str]]:
+    """驗收測試依副檔名分兩家：(pytest 的, bun test 的)。"""
+    ts = [p for p in 路徑們 if p.endswith(_ts副檔名)]
+    return [p for p in 路徑們 if p not in ts], ts
+
+
+def 找骨架(骨架目錄: Path, 測試路徑: str) -> Path | None:
+    """`測試骨架/*<檔名>.txt` 最後一個（同名多版取編號最大的）；沒有回 None。"""
+    if not 骨架目錄.is_dir():
+        return None
+    對應 = sorted(骨架目錄.glob(f"*{Path(測試路徑).name}.txt"))
+    return 對應[-1] if 對應 else None
 
 
 def 骨架不同版(根: Path, 骨架目錄: Path, 驗收: Sequence[str]) -> list[str]:
@@ -159,6 +176,7 @@ class 跑票:
     worktree: Path = field(init=False)
     base: str = field(init=False)
     實作家: str = field(init=False, default="")
+    待搬: list[tuple[Path, str]] = field(init=False, default_factory=list)  # (骨架檔, 相對目標路徑)
 
     def __post_init__(self) -> None:
         self.報告 = 報告(str(self.票路徑))
@@ -180,35 +198,78 @@ class 跑票:
         rc, out, _ = self.執行(["git", "status", "--porcelain"], self.根)
         if rc != 0 or out.strip():
             raise 停(站="前置", 原因="主目錄不乾淨，先 commit 或 stash")
-        缺 = [p for p in self.驗收 if not list(self.根.glob(p))]
-        if 缺:
-            raise 停(
-                站="前置",
-                原因=f"驗收測試檔不存在：{'、'.join(缺)}（票文寫錯層？tests/單元 vs tests/流程）",
-            )
-        不同 = 骨架不同版(self.根, self.票路徑.parent / "測試骨架", self.驗收)
+        骨架目錄 = self.票路徑.parent / "測試骨架"
+        # 主線沒有的驗收測試，必須在 測試骨架/ 有一份：開了 worktree 再搬進去（出題站）。
+        # 提前放紅測試進主線會讓同批其他票的 make check 紅掉。
+        在主線 = [p for p in self.驗收 if list(self.根.glob(p))]
+        for p in self.驗收:
+            if p in 在主線:
+                continue
+            骨架 = 找骨架(骨架目錄, p)
+            if 骨架 is None:
+                raise 停(
+                    站="前置",
+                    原因=f"驗收測試檔不存在也沒有骨架：{p}"
+                    f"（寫進 {骨架目錄.name}/NN-…{Path(p).name}.txt）",
+                )
+            self.待搬.append((骨架, p))
+        不同 = 骨架不同版(self.根, 骨架目錄, 在主線)
         if 不同:
             raise 停(
                 站="前置",
                 原因=f"測試骨架與 tests/ 不同版：{'、'.join(不同)}（搬錯版或改了沒 cp 回去）",
             )
-        rc, out, _ = self.執行(
-            ["uv", "run", "pytest", *self.驗收, "-x", "-q", "-p", "no:cacheprovider"], self.根
-        )
-        self.報告.記("前置", tests_exit_on_main=rc)
-        if rc == 0:
-            raise 停(站="前置", 原因="驗收測試在 main 上就是綠的：題目沒在測東西")
-        if rc == _pytest沒收到測試:
-            raise 停(站="前置", 原因="驗收測試一支都沒收到：路徑錯或還沒寫")
-        if rc == _pytest收集錯誤:
-            raise 停(
-                站="前置", 原因="驗收測試收集就錯（import 錯、名字打錯）：那不是紅，是題目壞了"
-            )
-        if rc in _pytest自己壞:
-            raise 停(
-                站="前置", 原因=f"pytest 退出碼 {rc}（內部錯或用法錯）：不是紅，先修環境或路徑"
-            )
+        if 在主線:
+            rc, _ = self.跑驗收(在主線, self.根, 快停=True)
+            self.報告.記("前置", tests_exit_on_main=rc)
+            self._判紅(rc, 站="前置")
         rc, out, _ = self.執行(["git", "rev-parse", "HEAD"], self.根)
+        self.base = out.strip()
+
+    def 跑驗收(self, 路徑們: Sequence[str], cwd: Path, *, 快停: bool) -> tuple[int, str]:
+        """pytest 與 bun test 各跑各的；pytest 的特殊退出碼優先回傳（前置站要分辨）。"""
+        py, ts = 分家(路徑們)
+        rc_py = rc_ts = 0
+        輸出 = ""
+        if py:
+            argv = ["uv", "run", "pytest", *py, "-q", "-p", "no:cacheprovider"]
+            if 快停:
+                argv.append("-x")
+            rc_py, out, err = self.執行(argv, cwd)
+            輸出 += out + err
+        if ts:
+            # bun 分不出「斷言紅」與「import 壞」（都 1）；審查站的 test_to_definition 是後盾。
+            rc_ts, out, err = self.執行(["bun", "test", *ts], cwd)
+            輸出 += out + err
+        return (rc_py or rc_ts), 輸出
+
+    def _判紅(self, rc: int, *, 站: str) -> None:
+        if rc == 0:
+            raise 停(站=站, 原因="驗收測試在實作前就是綠的：題目沒在測東西")
+        if rc == _pytest沒收到測試:
+            raise 停(站=站, 原因="驗收測試一支都沒收到：路徑錯或還沒寫")
+        if rc == _pytest收集錯誤:
+            raise 停(站=站, 原因="驗收測試收集就錯（import 錯、名字打錯）：那不是紅，是題目壞了")
+        if rc in _pytest自己壞:
+            raise 停(站=站, 原因=f"pytest 退出碼 {rc}（內部錯或用法錯）：不是紅，先修環境或路徑")
+
+    # 站 2b：出題（骨架搬進 worktree、commit、在 worktree 看它紅）
+    def 出題(self) -> None:
+        if not self.待搬:
+            return
+        for 骨架, 目標 in self.待搬:
+            目的 = self.worktree / 目標
+            目的.parent.mkdir(parents=True, exist_ok=True)
+            目的.write_text(骨架.read_text(encoding="utf-8"), encoding="utf-8")
+        self.執行(["git", "add", "-A"], self.worktree)
+        rc, _, err = self.執行(["git", "commit", "-q", "-m", f"出題：{self.slug}"], self.worktree)
+        if rc != 0:
+            raise 壞(原因=f"出題 commit 失敗：{err.strip()[-200:]}")
+        rc, _ = self.跑驗收([目標 for _, 目標 in self.待搬], self.worktree, 快停=True)
+        self.報告.記("出題", moved=[目標 for _, 目標 in self.待搬], tests_exit=rc)
+        self._判紅(rc, 站="出題")
+        # base 移到出題 commit：審查的 diff 才不會把測試檔當超範圍。
+        rc, out, _ = self.執行(["git", "rev-parse", "HEAD"], self.worktree)
         self.base = out.strip()
 
     # 站 2：worktree
@@ -299,10 +360,8 @@ class 跑票:
         rc, out, err = self.執行(["make", "check"], self.worktree)
         rc2, out2 = 0, ""
         沒涵蓋 = [t for t in self.驗收 if not t.startswith(_check涵蓋)]
-        if 沒涵蓋:  # make check 已跑 tests/單元 與 tests/流程，不重跑
-            rc2, out2, _ = self.執行(
-                ["uv", "run", "pytest", *沒涵蓋, "-q", "-p", "no:cacheprovider"], self.worktree
-            )
+        if 沒涵蓋:  # make check 已跑 _check涵蓋 那些目錄，不重跑
+            rc2, out2 = self.跑驗收(沒涵蓋, self.worktree, 快停=False)
         self.報告.記("驗收", round=輪, files=檔案, check_exit=rc, tests_exit=rc2)
         if rc == 0 and rc2 == 0:
             return None
@@ -408,6 +467,7 @@ class 跑票:
     def 全部(self) -> None:
         self.前置()
         self.開worktree()
+        self.出題()
         self.實作到綠()
         commit = self.commit()
         self.審查(commit)

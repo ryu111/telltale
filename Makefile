@@ -12,6 +12,8 @@ check:
 	$(PY) ruff format --check --no-cache .
 	$(PY) mypy --no-incremental
 	$(PY) pytest -n $(WORKERS) --dist load tests/單元
+	@# plugin 本體：bun 對「沒有任何 *.test.ts」回 1，所以先 find 再跑，零測試檔不算紅
+	@if find hooks -name '*.test.ts*' 2>/dev/null | grep -q .; then bun test hooks/; else echo "bun test: no test files under hooks/ yet"; fi
 
 # 一張已核准的票從派工走到 merge（scripts/跑票.py）：停下來就印 JSON 報告、退出碼 3。
 ticket:
@@ -22,7 +24,6 @@ tickets:
 	$(PY) python scripts/跑全部票.py $(F)
 
 # 測試有沒有在測：題目 §5.2 的突變清單（故意改壞一行 → 測試要轉紅）。跑票.py 的第 5 站會叫它。
-# 腳本在 harness 票落地前不存在：這裡故意紅，不假裝過。
+# 清單 hooks/mutations.json 為空時印 0 mutations declared、綠；每張票要 append 自己的條目。
 mutate:
-	@test -f scripts/突變.py || { echo "scripts/突變.py 還沒落地（harness 票）：mutate 不能過"; exit 1; }
 	$(PY) python scripts/突變.py

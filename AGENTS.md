@@ -4,7 +4,8 @@
 拿一張 `docs/tasks/<feature>/NN-<slug>.md` 的票去實作。
 - **只讀清單**：票的「可碰檔案」「相關檔案」「驗收測試」三行列的檔案。不要掃 repo、不要 grep 全庫、不要讀清單外的檔案。
 - **只改可碰檔案**。`tests/` 是出題者的，一個字都不准動；覺得題目錯，寫在回報的 `stuck` 裡，不繞。
-- **先看它紅**：先跑驗收測試（`uv run pytest <驗收測試路徑> -x`）。一開始就綠 → 停，回報 `stuck: "題目沒在測東西"`。
+- **先看它紅**：先跑驗收測試（`.py` 用 `uv run pytest <路徑> -x`；`.test.ts`／`.test.tsx` 用 `bun test <路徑>`）。一開始就綠 → 停，回報 `stuck: "題目沒在測東西"`。
+- 這個 repo 的產品是 TypeScript plugin（`hooks/`），型別只看 `.claude/types/claude-code.d.ts` 裡票指到的行段，不要整份讀。
 - 紅 → 綠 → 重構，最少的程式碼讓它綠。`make check` 綠才算完。
 - 不跑 `make mutate`、不做 code-review，那是驗收站的事。
 - 不 commit、不開分支、不動 git：worktree 與 commit 由跑票的人管。

@@ -35,3 +35,6 @@ Local markdown：spec 在 `docs/SDD.md`，票在 `docs/tasks/<feature>/NN-<slug>
 ### Domain docs
 
 Single-context：根目錄 `CONTEXT.md` ＋ `docs/adr/`（缺就略過，由 domain-modeling 懶建）。See `docs/agents/domain.md`.
+- template 的 `scripts/跑票.py` 原本只認 pytest、且要求驗收測試先在主線上（紅）；/拆任務 skill 說的「骨架自動搬進 worktree」template 沒做。本 repo 已改：主線沒有的驗收測試從 `docs/tasks/<feature>/測試骨架/*<檔名>.txt` 搬進 worktree、commit「出題」、在 worktree 看紅；`.test.ts(x)` 走 `bun test`。**這是 template 該回收的修正。**
+- `bun test <目錄>` 在目錄裡沒有任何 `*.test.*` 時退出碼 1（不是 0），`make check` 用 find 先擋；空的 `.test.ts` 檔（0 個 test）退出碼 0。
+- `mattpocock-skills:to-tickets` 沒裝在這台（plugin 只裝了部分 skill），票照 `docs/tasks/00-範本.md` 手寫。
