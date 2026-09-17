@@ -143,4 +143,21 @@ test("ui.render wants: a staged panel's minRows/wantRows follow size.<id>, not i
   expect(props.panels.find((p) => p.id === "agents")?.rows).toBe(CONTENT_ROWS_MAX - PANEL_TITLE_ROWS);
 });
 
-test.todo("ui.message stage on a non-staged panel id (hello) is ignored, not treated as toggle");
+test("ui.message stage on a non-staged panel id (hello) is ignored, not treated as toggle", async () => {
+  // Ticket 11: a panel without stages never reacts to kind:"stage" (its clicks post "toggle" instead). Exact.
+  const hello: Panel = { id: "hello", label: "hello", defaultOn: true, minRows: 1, wantRows: 2, view: () => ({ id: "hello", lines: [] }) };
+  const reg = makeRegister([hello]);
+  const eng = fakeEngine({ store: { panels: { hello: true } } });
+  reg(eng.on, {});
+  await eng.fire("session.start", {});
+  await eng.fire("ui.message", { data: { kind: "stage", id: "hello" } });
+  expect(eng.store.panels).toEqual({ hello: true });
+  expect(eng.store["size.hello"]).toBeUndefined();
+});
+
+test("runTelltale: `<unknown> size` and `<unknown> size full` report the unknown panel, not usage", () => {
+  // Ticket 11: id is checked before the sub-command, same order as round one. Exact.
+  const state = stagedState();
+  expect(runTelltale("nope size", state).text).toContain("unknown panel");
+  expect(runTelltale("nope size full", state).text).toContain("unknown panel");
+});
