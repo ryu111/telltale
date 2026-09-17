@@ -2,7 +2,30 @@
 // No `claude-code` import, no `$`.
 
 import { MIN_COLUMNS } from "./layout";
-import type { BandProps } from "./register";
+import type { PanelLine } from "./panel";
+
+// SDD §1.5 defines these alongside `hooks/band.tsx`; the ticket's own
+// "相關檔案" line says to import them from `./register`, but ticket 05 never
+// exported them there (register.tsx has no `BandProps`/`BandPanel`; a plain
+// `import type` from it is only silently fine because bun erases type-only
+// imports without checking the target — `make check` has no `tsc` step to
+// catch it). SDD wins on a ticket/SDD conflict (00-共同規則); defined here,
+// pure, matching the SDD code block verbatim, and re-exported from band.tsx.
+export type BandPanel = {
+  id: string;
+  label: string;
+  rows: number;
+  lines: PanelLine[];
+  at: number | null;
+  error: string | null;
+};
+export type BandProps = {
+  columnsHint: number;
+  total: number;
+  panels: BandPanel[];
+  dropped: string[];
+  now: number;
+};
 
 // The real engine draws a `[-]` collapse control over the rightmost 3 columns
 // of a Client's title row; +1 column of buffer so a click just left of it

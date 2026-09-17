@@ -5,11 +5,13 @@
 // script in the ticket covers it.
 
 import type { ClientSurface } from "claude-code";
-import { hitPanel, isClick, TITLE_RESERVE } from "./hit";
+import { hitPanel, isClick, rowsOf, TITLE_RESERVE } from "./hit";
+import type { BandPanel, BandProps } from "./hit";
 import { MIN_COLUMNS } from "./layout";
 import type { Tone } from "./panel";
-import type { BandProps } from "./register";
 import { displayWidth, fit } from "./width";
+
+export type { BandPanel, BandProps };
 
 // Local to this surface module — never crosses the `$`/Client JSON boundary.
 export type BandState = { down: { x: number; y: number } | null };
@@ -47,6 +49,30 @@ const statusLine = (props: BandProps, columns: number): string => {
   return fit(`updated ${agoSeconds}s ago`, columns);
 };
 
+type Row = { text: string; tone?: Tone };
+
+// The single source of truth for row *positions* is `rowsOf` (hit.ts); this
+// builds the array of what to draw at each of those positions so drawing and
+// hit-testing can never disagree about where a panel's title row is.
+const buildRows = (props: BandProps, columns: number): Row[] => {
+  const rows: Row[] = new Array(props.total);
+  rows[0] = { text: fit(`telltale · ${props.panels.length} panels`, columns - TITLE_RESERVE) };
+  const titleRowOf = rowsOf(props);
+  for (const panel of props.panels) {
+    const titleY = titleRowOf[panel.id];
+    rows[titleY] = { text: panelTitleLine(panel.label, columns) };
+    for (let i = 0; i < panel.rows; i += 1) {
+      const line = panel.lines[i];
+      rows[titleY + 1 + i] = line ? { text: fit(line.text, columns), tone: line.tone } : { text: "" };
+    }
+  }
+  rows[props.total - 1] = { text: statusLine(props, columns) };
+  // Defensive: any row `layout`/panels didn't account for still draws blank
+  // rather than crashing on a hole in a sparse array.
+  for (let i = 0; i < rows.length; i += 1) rows[i] ??= { text: "" };
+  return rows;
+};
+
 export function Band(props: BandProps, surface: ClientSurface<BandState>) {
   const { Box, Text } = surface.elements;
   const columns = surface.columns || props.columnsHint;
@@ -77,36 +103,35 @@ export function Band(props: BandProps, surface: ClientSurface<BandState>) {
     );
   }
 
-  // All panels off (or, defensively, everything dropped for height): the
-  // hooks module reports `total: 1` for exactly this case — one line, title
-  // and status merged into it.
-  if (props.panels.length === 0) {
+  // `total === 1`: the hooks module only reports this for the empty-`wants`
+  // layout special case, i.e. title and status collapse into one line.
+  // Genuinely all off (nothing dropped either) gets the fixed message;
+  // squeezed to one row while panels are actually on (dropped non-empty)
+  // gets the ordinary status text instead of the misleading "all off" one.
+  if (props.total === 1) {
+    const text =
+      props.panels.length === 0 && props.dropped.length === 0
+        ? "telltale · all panels off · /telltale on"
+        : statusLine(props, columns);
     return (
       <Box flexDirection="column">
-        <Text>{fit("telltale · all panels off · /telltale on", columns)}</Text>
+        <Text>{fit(text, columns)}</Text>
       </Box>
     );
   }
 
-  const bandTitle = fit(`telltale · ${props.panels.length} panels`, columns - TITLE_RESERVE);
+  const rows = buildRows(props, columns);
 
   return (
     <Box flexDirection="column">
-      <Text>{bandTitle}</Text>
-      {props.panels.map((panel) => (
-        <Box flexDirection="column">
-          <Text>{panelTitleLine(panel.label, columns)}</Text>
-          {panel.lines.map((line) => {
-            const tp = toneProps(line.tone);
-            return (
-              <Text color={tp.color} dimColor={tp.dimColor}>
-                {fit(line.text, columns)}
-              </Text>
-            );
-          })}
-        </Box>
-      ))}
-      <Text>{statusLine(props, columns)}</Text>
+      {rows.map((row) => {
+        const tp = toneProps(row.tone);
+        return (
+          <Text color={tp.color} dimColor={tp.dimColor}>
+            {row.text}
+          </Text>
+        );
+      })}
     </Box>
   );
 }
