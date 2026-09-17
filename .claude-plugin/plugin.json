@@ -1,0 +1,22 @@
+{
+  "name": "telltale",
+  "version": "0.1.0",
+  "description": "A live status band for Claude Code.",
+  "author": {
+    "name": "ryu111"
+  },
+  "userConfig": {
+    "panel_hello": {
+      "type": "boolean",
+      "title": "Hello panel",
+      "description": "Show the hello panel",
+      "default": true
+    },
+    "panel_clock": {
+      "type": "boolean",
+      "title": "Clock panel",
+      "description": "Show the clock panel",
+      "default": true
+    }
+  }
+}
