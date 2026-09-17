@@ -14,7 +14,7 @@ export type PanelView = {
 };
 
 export type PanelIo = {
-  now: () => number; // framework passes `() => $.clock.now()` (wrapped, never the bare $.clock.now)
+  now: () => Promise<number>; // framework passes `() => $.clock.now()` (async since 2.1.274; wrapped, never the bare $.clock.now)
   // v0.1: no panel needs fetch yet. The day one does, validate's `calls:` gains $.http.fetch — update README too.
 };
 

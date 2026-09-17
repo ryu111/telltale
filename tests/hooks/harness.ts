@@ -107,9 +107,9 @@ export const fakeEngine = (opts: FakeEngineOpts = {}): FakeEngine => {
       },
     },
     clock: {
-      now: () => {
+      now: async () => {
         bump("$.clock.now");
-        return state.now;
+        return state.now; // async since 2.1.274: a Promise in Client props is refused as "a class instance"
       },
       every: (ms, fn) => {
         bump("$.clock.every");

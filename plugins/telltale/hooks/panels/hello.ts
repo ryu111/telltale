@@ -21,7 +21,7 @@ export const hello: Panel<HelloData> = {
   minRows: 1,
   wantRows: 2,
   everyMs: 5000,
-  poll: async (io) => ({ tick: io.now() }),
+  poll: async (io) => ({ tick: await io.now() }),
   view: (data, columns, rows) => {
     const lines: PanelLine[] = [];
 

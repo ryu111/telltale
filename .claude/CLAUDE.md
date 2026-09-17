@@ -27,6 +27,7 @@ claude plugin validate --strict .      # 根目錄是 marketplace（.claude-plug
 
 ## 這個 repo 的坑
 （看檔案看不出來、踩到會很貴、下次還會再踩的，才寫在這裡）
+- 2026-09-17 升到 **2.1.274**（`claude install latest`；stable 頻道停在 2.1.267）。274 的破壞性改動：`hooks.json` 的 `surface` 欄位拿掉，Client 改 `module="./band.tsx"`（相對路徑字面值）；`$.clock.now()` 變 **async**（Promise 塞進 Client props 會被拒繪「a class instance」）；`claude plugin test <dir>` **存在了**（測試 import `claude-code/testing`），v0.2 要決定要不要從 bun 搬過去；Pane 會自適應（≥~140 欄靠右 dock，窄了落到輸入框上方的方框，實測 150→100 欄）；AbovePrompt 的 `e.viewport.columns` 仍＝終端寬，但開著 Pane 時是扣掉 Pane 的寬。
 - `claude plugin test` 在 2.1.267 **不存在**（帶 `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` 也沒有；`plugin --help` 只有 validate／eval／init 等）。題目 DoD #2 改成自建 harness。2026-09-17 查：npm latest 是 2.1.274 但 native installer 的 stable channel 停在 2.1.267，`claude update` 不會升。
 - `which claude` 指到 cmux 的 shim（bash script），要 grep 真 binary 看 `~/.local/share/claude/versions/<ver>`。
 - function hooks 相關字串（`AbovePrompt`、`bodyColumns`、`onPointer`、`hooks module`）在 2.1.267 binary 裡都有，機制存在，只是被旗標關著。

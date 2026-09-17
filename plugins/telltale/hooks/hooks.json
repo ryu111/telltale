@@ -1,4 +1,3 @@
 {
-  "modules": ["register.tsx"],
-  "surface": "band.tsx"
+  "modules": ["register.tsx"]
 }

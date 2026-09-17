@@ -79,7 +79,7 @@ test("render hands a Client 'band' / module 'Band' whose props are plain JSON wi
   const c = clientOf(await render(eng));
   expect(c).not.toBeNull();
   expect(c!.props.key).toBe("band");
-  expect(c!.props.module).toBe("Band");
+  expect(c!.props.module).toBe("./band.tsx");
   const p = c!.props.props as Record<string, unknown>;
   expect(JSON.parse(JSON.stringify(p))).toEqual(p);
   expect(Object.keys(p).sort()).toEqual(["columnsHint", "dropped", "now", "panels", "total"]);

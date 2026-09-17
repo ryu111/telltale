@@ -21,7 +21,7 @@ export const clock: Panel<ClockData> = {
   minRows: 1,
   wantRows: 1,
   everyMs: 1000,
-  poll: async (io) => ({ now: io.now() }),
+  poll: async (io) => ({ now: await io.now() }),
   view: (data, columns) => {
     if (data === undefined) {
       return { id: "clock", lines: [{ text: fit("--:--:--", columns), tone: "dim" }] };

@@ -57,8 +57,8 @@ test("hello with one row draws one line only", () => {
 });
 
 test("hello.poll returns the tick from io.now (I6: pure in its input)", async () => {
-  expect(await hello.poll!({ now: () => 42 })).toEqual({ tick: 42 });
-  expect(await hello.poll!({ now: () => 42 })).toEqual(await hello.poll!({ now: () => 42 }));
+  expect(await hello.poll!({ now: async () => 42 })).toEqual({ tick: 42 });
+  expect(await hello.poll!({ now: async () => 42 })).toEqual(await hello.poll!({ now: async () => 42 }));
 });
 
 test("clock: HH:MM:SS, or a visible --:--:-- placeholder without data", () => {
@@ -69,7 +69,7 @@ test("clock: HH:MM:SS, or a visible --:--:-- placeholder without data", () => {
 });
 
 test("clock.poll returns now", async () => {
-  expect(await clock.poll!({ now: () => 7 })).toEqual({ now: 7 });
+  expect(await clock.poll!({ now: async () => 7 })).toEqual({ now: 7 });
 });
 
 test("every panel line fits the columns it was given (CJK counts 2) and rows are respected", () => {

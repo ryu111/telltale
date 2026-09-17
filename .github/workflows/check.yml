@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - uses: oven-sh/setup-bun@v2
-      - run: npm install -g @anthropic-ai/claude-code@2.1.267  # pinned: the validate note format README is diffed against is this build's
+      - run: npm install -g @anthropic-ai/claude-code@2.1.274  # pinned: the validate note format README is diffed against is this build's
       - run: uv sync
       - run: make check
       - run: make mutate

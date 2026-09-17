@@ -62,7 +62,7 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
             if (bytes > DATA_MAX_BYTES) {
               await $.store.set(`error.${p.id}`, "data too large");
             } else {
-              await $.store.set(`data.${p.id}`, { at: $.clock.now(), data });
+              await $.store.set(`data.${p.id}`, { at: await $.clock.now(), data });
               await $.store.set(`error.${p.id}`, "");
             }
           } catch (err) {
@@ -91,7 +91,7 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
     const { slots, dropped, total } = layout(wants, e.props.maxRows as number);
     const viewportColumns = (e.viewport as { columns?: number } | undefined)?.columns;
     const columnsForView = Math.max(MIN_COLUMNS, viewportColumns ?? 80);
-    const now = $.clock.now();
+    const now = await $.clock.now();
 
     const bandPanels = await Promise.all(
       slots.map(async (slot) => {
@@ -114,7 +114,7 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
     return (
       <Client
         key="band"
-        module="Band"
+        module="./band.tsx"
         props={
           {
             columnsHint: viewportColumns ?? 80,

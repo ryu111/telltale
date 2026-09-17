@@ -16,3 +16,4 @@ node_modules/
 .claude/settings.local.json
 .claude/types/
 .worktrees/
+docs/參考/*.mp4
