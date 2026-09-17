@@ -26,6 +26,17 @@
 - `command.register` 的 `name` 只准 `[A-Za-z0-9_-]{1,64}`。
 - `$.store` 是 plugin 層級、跨 session 共用（同一個人所有 session 看到同一份）。
 
+### 0.1 第二輪追加（2026-09-17，spike 實測：`scratchpad/spike/probe.tsx`，一次真的派 Explore subagent＋背景 Bash）
+
+| 題目說 | 型別檔／實測說 | 本檔的決定 |
+|---|---|---|
+| §7.1 資料層走 PostToolUse shell hook 寫 JSONL | 2.1.267 有 `$.agent.list()`：`{ id, description, type, status, parentId?, name?, spawnedBy? }`，2 s 輪詢就看到 running→completed | 不寫 JSONL、不開 `$.fs.read`；`calls:` 多 `$.agent.list` |
+| §7.1 顯示 id／type／status／**model** | `AgentInfo` 沒有 model；model 只在派工那步 `turn.step` 的 `Agent` 工具 input 裡 | 用 description 對回去（§2.6），對不到就顯示空 |
+| — | **背景 Bash／Monitor／Workflow 不在 `agent.list`**；只出現在派它的 `turn.step.toolUses[].input`（`run_in_background: true`）與結束時 `session.receive{origin=task-notification}` 的 text（含 `Background command "<description>" completed`） | 背景任務用 description 配對（§2.6）；使用者裁定守 §6 規矩，不 hook `classic.PostToolUse` 換精確 id |
+| — | `ui.render{component=Spinner}` 給 `mode`（responding／tool-input／tool-use／thinking／requesting），沒有經過時間 | 經過時間從 `turn.start` 的時刻自己算 |
+| — | `session.start` hook 沒 `return next(e)` 整個被跳過（`hook failed: returned no result`），timer 也不會活 | 每個 hook 一律 `return next(e)`（I13） |
+| — | 平常載入：`~/.claude/skills/telltale` symlink 到 checkout 可行，`settings.json` 的 `env` 開旗標可行 | README／CLAUDE.md 已寫 |
+
 ## 穩定層（先定，定完盡量不動）
 
 ### 1. 介面
@@ -68,6 +79,30 @@ export type Panel<D = unknown> = {
 - 框架保證呼叫時 `columns ≥ MIN_COLUMNS (=20)`、`rows ≥ minRows`；面板在這個範圍內**一定要回內容**，不回 `null`（型別上就沒有 null）。寬度不夠就裁，不是消失——「面板因寬度消失」不存在，只有「因高度 dropped」（§1.2）。
 - 輸出的每一行 `displayWidth(text) ≤ columns`、`lines.length ≤ rows`；超出是面板的 bug，框架**不補救**，測試會抓。
 
+#### 1.1a v0.2 擴充：動態列與框架注入的資料源
+
+面板仍是純函式，但 agents 面板有兩件事第一輪的契約裝不下：**每幀要動的東西**（spinner、經過時間、時序 bar）與**資料不是 poll 回傳的 JSON 而是引擎的即時清單**。擴充如下，舊面板不受影響（欄位都是 optional）：
+
+```ts
+export type Live = {
+  spinner?: boolean;                    // 前綴轉 braille spinner（Client 幀時鐘，80 ms）
+  sinceAt?: number;                     // 有值就在列尾畫 elapsed = now - sinceAt，每秒跳
+  lane?: { startAt: number; endAt?: number }; // 有值就在 text 與 elapsed 之間畫時序 bar（視窗 LANE_WINDOW_MS = 60_000）
+  flashUntil?: number;                  // now < flashUntil 時整列粗體（狀態剛切換 1 s）
+};
+export type PanelLine = { text: string; tone?: Tone; live?: Live; hit?: string }; // hit：這列可點，點了 post { kind: "row", id, hit }
+
+export type PanelIo = {
+  now: () => number;
+  agents?: () => Promise<AgentInfo[]>;   // 框架包 $.agent.list；只有宣告 needsAgents 的面板拿得到
+  activity?: () => Activity;             // 框架在記憶體裡維護的主迴圈／背景任務狀態（§2.6），同步讀
+};
+export type Panel<D> = { ...第一輪欄位...; needsAgents?: boolean; stages?: Stages }; // Stages 見 §1.2 規則 8
+```
+
+- `live` 的**組合**（spinner ＋ text ＋ bar ＋ elapsed 裁到 columns）是純函式 `composeLive(line, now, frame, columns): string`，住 `hooks/live.ts`，Client 每幀呼叫；hooks module 不參與動畫，所以 `$.ui.invalidate` 仍是每秒一次（agents poll）。
+- `hit` 讓一列可點：Client 用 `rowsOf` 同一套列數推算命中，post `{ kind: "row", id: <panel>, hit: <string> }` 給 `ui.message`；面板在 `onRow?(hit, state) => state` 純函式裡決定意思（agents：展開／收合／點掉失敗列）。
+
 #### 1.2 版面調度（`hooks/layout.ts`）：框架核心，純函式，只管高度
 
 ```ts
@@ -93,6 +128,8 @@ export const layout = (panels: readonly Want[], maxRows: number): Layout;
 7. `layout` **不吃 columns**：寬度改變永遠不改變高度。帶子高度只在「maxRows 變」或「開關變」時變（回答使用者「resize 時高度跳動」的顧慮）。
 
 預設狀態的高度（v0.1，hello 與 clock 都開）：`FIXED_ROWS + (1 + hello.wantRows) + (1 + clock.wantRows) = 2 + 3 + 2 = 7` 列，寫進 README。
+
+規則 8（v0.2，段位）：面板可宣告 `stages: { summary: 0, compact: 3, full: "rest" }`，目前段位存 `$.store` 的 `size.<id>`（預設 `compact`）。`layout()` 收到的 `minRows／wantRows` 由框架依段位算：`summary → (0, 0)`（只畫標題列，摘要文字由面板 `title(data)` 提供）、`compact → (2, 3)`、`full → (3, CONTENT_ROWS_MAX)`，`"rest"` 的意思是「剩多少要多少」，仍受規則 2／5 約束。沒有 `stages` 的面板照第一輪（minRows／wantRows 固定）。
 
 #### 1.3 顯示寬度（`hooks/width.ts`）：純函式
 
@@ -145,6 +182,14 @@ export function Band(props: BandProps, surface: ClientSurface<BandState>): Rende
 - **每次呼叫都重掛 `surface.onPointer`**（回呼裡只讀 `surface.state`、不讀閉包）。點擊 = `down` 後同一格 `up`；落在某面板標題列且 `x < columns - TITLE_RESERVE` → `surface.post({ kind: "toggle", id })`。最右 4 欄是死區（README 寫明）。hover 不做。
 - **這個檔的輸出沒有自動測試守著**（Client 在繪製執行緒）；命中判定 `hitPanel(y, panels): string | null` 抽到 `hooks/hit.ts` 純函式去測（列數從 `props.total` 與各 `rows` 算，跟畫的用同一個函式 `rowsOf(props)`，不許兩份）。
 
+v0.2 追加（Client）：
+
+- **點面板標題列**：v0.2 起＝**循環段位**（summary → compact → full → summary），post `{ kind: "stage", id }`；不再是開關。開關只剩 `/telltale <id> [on|off]`。沒有 `stages` 的面板（hello／clock）點標題仍是開關（相容第一輪 DoD #3 的實測與測試）。
+- **標題列最右的視圖字樣**（`lanes`／`tree`，寬 5，在 TITLE_RESERVE 死區左側）點了 post `{ kind: "view", id }`。
+- **內容列**：`PanelLine.hit` 有值的列可點，post `{ kind: "row", id, hit }`。
+- **動畫**：Client 用 `surface.every(80, …)` 走幀計數，只重畫有 `live` 的列；`surface.every(1000, …)` 讓 elapsed 與 lanes bar 每秒更新。每幀繪製量要量：全滿 7 列 × 150 欄的 `composeLive` 必須 < 5 ms（ClientModule 超時會被卸載，題目 §3.4）。
+- 狀態切換高亮：面板在 view 裡給 `flashUntil = at + 1000`，Client 只看時間，不記狀態。
+
 #### 1.6 `/telltale` command
 
 | 輸入 | 輸出 `text` |
@@ -155,6 +200,16 @@ export function Band(props: BandProps, surface: ClientSurface<BandState>): Rende
 | `/telltale on`／`off` | 全部面板，一面板一行同上格式 |
 | `/telltale help`、或任何不合語法的輸入（第三個 token、`on`/`off` 以外的第二個 token） | `usage: /telltale [status|help|on|off|<panel> [on|off]]  panels: hello, clock`（面板清單由註冊表動態列出） |
 | 未知 id | `unknown panel "x"; known: hello, clock`（不猜、不模糊比對） |
+
+v0.2 追加：
+
+| 輸入 | 輸出 |
+|---|---|
+| `/telltale agents view` | `agents view: lanes`（目前值） |
+| `/telltale agents view lanes` ／ `tree` | `agents view: lanes → tree`；相同回 `(unchanged)` |
+| `/telltale agents size` ／ `size summary|compact|full` | 同上格式，鍵 `size.agents` |
+| `/telltale agents clear` | 點掉所有 failed／killed 與孤兒 lane：`agents: cleared 2` |
+| `/telltale status` | 每個面板多印段位：`● agents  on   compact  3 rows` |
 
 ### 2. 資料模型
 
@@ -169,6 +224,17 @@ export function Band(props: BandProps, surface: ClientSurface<BandState>): Rende
 `panels` 是**同一個人所有 session 共用**（§0 最後一條）：在 session A 關掉，session B 下一次 render 也會少那塊。這是 /config 一樣的語意，README 寫明；不做 per-session（挑毛病 Q2 已定）。
 
 寫 `data.<id>` 沒有原子性；多 session 同時 poll 只會重複寫同一種值，無害（I6）。
+
+v0.2 追加的鍵（仍是完備表；每鍵 < 64 KiB，I5 同樣適用）：
+
+| 鍵 | 值 | 誰寫 |
+|---|---|---|
+| `size.<id>` | `"summary" \| "compact" \| "full"` | stage 訊息、`/telltale <id> size` |
+| `view.agents` | `"lanes" \| "tree"` | view 訊息、`/telltale agents view` |
+| `agents.seen` | `{ [agentId]: { firstAt, endAt?, model?, dismissed?: true } }`；60 s 前結束且非 failed／killed 的條目在下一次 poll 時清掉 | agents 的 poll（框架代寫） |
+| `agents.tasks` | `{ [key]: { kind: "shell"\|"monitor"\|"workflow", description, startAt, endAt?, dismissed?: true } }`，key = `${startAt}-${description}` | `turn.step`／`session.receive` hook |
+| `agents.turn` | `{ turnId, startedAt, endedAt?, phase, tools: string[], prompt: string(≤60) }` | `turn.*`／`ui.render{Spinner}` hook |
+| `agents.expanded` | `agentId \| null` | row 訊息 |
 
 #### 2.2 面板註冊表（`hooks/panels/index.ts`）
 
@@ -186,6 +252,21 @@ export function Band(props: BandProps, surface: ClientSurface<BandState>): Rende
 - `id: "hello"`, `label: "hello"`, `minRows: 1`, `wantRows: 2`, `everyMs: 5000`
 - `poll`: 回 `{ tick: io.now() }`（poll 拿不到上一次的值，所以不做計數器）。
 - `view`: 第 1 行 `hello · <HH:MM:SS of tick>`；第 2 行（有第 2 列時）`寬 W 欄 · 高 R 列`（故意放中文，讓寬度計算有真實案例）。`data` 為 undefined 時第 1 行是 `hello · waiting for first tick`（tone `dim`）。tone 示範（挑毛病 Q3）：第 1 行依 tick 的秒數奇偶給 `up`／`flat`，第 2 行固定 `dim`；`down` 只在 band.tsx 的對應表裡，hello 不用。
+
+#### 2.6 agents 面板（`hooks/panels/agents.ts`；長相以 `docs/DESIGN.md` 為準）
+
+- `id: "agents"`, `label: "agents"`, `defaultOn: true`, `needsAgents: true`, `stages: { summary: 0, compact: 3, full: "rest" }`, `everyMs: 1000`。
+- **poll**（每秒）：`io.agents()` → 對照 `agents.seen`：新 id 記 `firstAt = now`；status 從 running 變成其他記 `endAt = now`、`flashUntil = now + 1000`；`completed` 且 `now - endAt > 60_000` 的刪；failed／killed 留到 `dismissed`。回傳的 data ＝ `{ at, agents: AgentInfo[], seen, tasks, turn, expanded }`（框架把 `seen`／`tasks`／`turn` 從 store 併進來）。
+- **model 對回去**：`turn.step` 看到 `Agent` 工具 input（`description`、`model?`、`subagent_type`）就記到 `agents.pendingSpawns`（記憶體，不進 store）；下一次 poll 出現的新 agent 若 `description` 相同，取最早一筆的 `model` 寫進 `seen[id].model`，配不到就空。
+- **背景任務**：`turn.step` 的 toolUses 裡 `Bash{ run_in_background: true }` → `tasks` 開 `shell`（description 取 input.description，缺就 command 前 40 字）；`Monitor` → `monitor`；`Workflow` → `workflow`。`session.receive{origin=task-notification}` 的 text 用 regex `Background command "([^"]+)" completed|Task "([^"]+)"|Workflow "([^"]+)"` 抓 description，關掉最早一條同名未結束的 task（`endAt = now`）。30 min 沒關的標孤兒（tone 黃、符號 `?`），點掉或 `/telltale agents clear` 才收；不自動刪。
+- **主迴圈**：`turn.start` → `agents.turn = { turnId, startedAt: now, phase: "responding", tools: [], prompt }`；`ui.render{Spinner}` → `phase = e.props.mode`（此 hook 一定 `return next(e)`，不畫）；`turn.step` → `tools = toolUses.map(name)`（最多存 8）；`turn.complete` → `endedAt = now`。60 s 後主迴圈列顯示 `idle`。
+- **view(data, columns, rows)**：`data.view`（lanes／tree）決定排版，兩種都走同一組純函式：`sortAgents`（running 先、再 firstAt、再 id：穩定）、`collapseLeaves`（同父＋葉＋type＋status 相同 → `type ×N`；只在 rows 不夠時做，做到塞得下或無可合併為止）、`fitRows`（仍不夠：MAIN 永遠在、running 全留、已結束的依 endAt 早的先收成 `… +N done`）。每列 `live` 依 DESIGN §1；`hit = agentId`（失敗列 hit 也是 id，onRow 依 status 決定是 dismiss 還是 expand）。`rows === 0`（summary 段）回空 lines，摘要由 `title(data)` 回：`⠼ 3 running · 1 done · 1 ✗`（spinner 由 Client 動）。
+- **onRow(hit, state)**：failed／killed → `seen[hit].dismissed = true`；其他 → `expanded = expanded === hit ? null : hit`。
+- **不做**（DESIGN §5）：hover、狀態歷史鏈、跨 session、降級版。
+
+#### 2.7 hello／clock 只在開發模式註冊
+
+`register` 時讀 `$.env.get("TELLTALE_DEV")`；等於 `"1"` 才把 hello／clock 放進 PANELS，否則只有 agents。`plugin.json` 的 `userConfig` 刪掉 `panel_hello`／`panel_clock`（沒有公開面板需要種子）。`calls:` 因此多 `$.env.get`（題目白名單本來就有）。第一輪的 register／band 測試改走 `makeRegister([...])` 注入面板，不依賴環境變數。
 
 #### 2.4 面板開關為什麼不用 `userConfig`
 
@@ -229,6 +310,25 @@ ui.message{ kind:"toggle" } / command.run{telltale}
 
 停止條件：`$.clock.every` 隨 module 卸載停；沒有其他迴圈。
 
+v0.2 追加的 pipeline：
+
+```
+session.start
+  └─ needsAgents 的面板：io.agents = () => $.agent.list()（包一層，面板拿不到 $）
+
+turn.start / turn.step / turn.complete / ui.render{Spinner} / session.receive{task-notification}
+  ├─ 更新 agents.turn ／ agents.tasks ／ pendingSpawns（§2.6）
+  ├─ $.ui.invalidate("ui.render")   （turn.* 與 task-notification 才 invalidate；Spinner 每 2 s 已被 poll 覆蓋，不 invalidate）
+  └─ return next(e)                  （全部；I13）
+
+ui.message{ kind: "stage" | "view" | "row" }
+  └─ 改對應 store 鍵 → $.ui.invalidate
+
+Band(props, surface)
+  ├─ surface.every(80)：frame++，只重畫 live.spinner 的列
+  └─ surface.every(1000)：重算 elapsed 與 lanes bar
+```
+
 ### 4. 測試 harness（取代不存在的 `claude plugin test`）
 
 `tests/hooks/harness.ts`：
@@ -246,6 +346,8 @@ export const fakeEngine = (opts?: { store?: Record<string, unknown>; now?: numbe
 
 **Client 內部畫的東西測不到**：`band.tsx` 只靠 `hit.ts`、`width.ts` 的純函式測試 + §5.3 tmux 實測。**I7（不重載）與 DoD #3 只有 tmux 實測算數**，fakeEngine 本來就不會重載，它的測試不能拿來當 DoD #3 的證據。
 
+v0.2 追加：fakeEngine 多 `agents: AgentInfo[]`（`$.agent.list` 回它的副本）、`emit(event, input)` 直接打 `turn.*`／`session.receive`／`ui.render{Spinner}` 進 hook 鏈、`env: Record<string,string>`（`$.env.get`）。`composeLive`／`laneBar`／`sortAgents`／`collapseLeaves`／`fitRows` 全是純函式，直接測；動畫的幀計數用參數傳入，不用真時鐘。
+
 ### 5. 不變量（不管怎麼實作都不能違反）
 
 | # | 不變量 | 守它的機制 |
@@ -261,6 +363,12 @@ export const fakeEngine = (opts?: { store?: Record<string, unknown>; now?: numbe
 | I9 | 不 hook `tool.call`／`classic.*`、不宣告 `process.*`／`fs.*`／`http.*`；`hooks.json` 只列一個 module | I1 涵蓋 |
 | I10 | 面板 `view` 拿到 `undefined` 也畫（不空白） | 單元測試 |
 | I11 | 每個寬度 ≥ MIN_COLUMNS 且 maxRows ≥ 4 時，畫面上至少有一行面板內容（擋「全砍掉就不會超寬」） | 切片 8 的腳本每步斷言 |
+| I12（v0.2） | `calls:` 恰好 = 七個 ＋ `$.agent.list` ＋ `$.env.get`；`hooks:` 恰好 = 第一輪四個 ＋ `turn.start`、`turn.step`、`turn.complete`、`ui.render{component=Spinner}`、`session.receive{origin=task-notification}`；仍無 `tool.call`／`classic.*` | I1 的測試改成 v0.2 的兩行 exact；README 區塊同步 |
+| I13（v0.2） | 每個 hook 都 `return next(e)`（觀察型 hook 不改任何事件的結果） | 流程測試：每種事件打進去，`next` 被呼叫恰好一次且 hook 回傳 === next 的回傳；突變：拿掉一個 `return next(e)` |
+| I14（v0.2） | `composeLive` 輸出的 `displayWidth ≤ columns`，任何 `now`／`frame`／`live` 組合 | 單元測試（含 columns 20、label 全中文、bar 視窗 0 寬）；突變：elapsed 不裁 |
+| I15（v0.2） | 排序穩定：同一組 agents 任何順序輸入，`sortAgents` 輸出相同；running 永遠在已結束之前 | property 測試（隨機打亂 50 次） |
+| I16（v0.2） | failed／killed 不會自動消失；completed 60 s 後一定消失 | 流程測試：假時鐘推 61 s |
+| I17（v0.2） | 背景任務 lane 只被同 description 的通知關掉；沒有通知的 30 min 後變孤兒、不刪 | 流程測試 |
 
 ## 切片層（一次只細化下一批 task）
 
@@ -278,20 +386,41 @@ export const fakeEngine = (opts?: { store?: Record<string, unknown>; now?: numbe
 | 8 | 寬度 200→30 逐步縮 | 腳本：`for w in 200 150 110 80 60 45 30`：tmux resize、capture、量每行寬度 ≤ w，且每步至少一行面板內容（I11）；另跑 `w=15` 確認只剩一列且不炸 | 腳本 |
 | 9 | README（貼 validate 輸出、高度 4 列、死區、emoji 不保證、store 位置與清除）、LICENSE（MIT）、CI | CI：`bun test` + `validate --strict` + **README 裡的 validate 區塊與當前輸出 diff 為空** | CI |
 
+### 第二輪功能（v0.2 agents 面板；2026-09-17 訪談；票由 /拆任務 拆）
+
+目標（使用者裁定）：**任何 Claude Code 使用者裝了就有用**——這個 session 正在做的（主迴圈）與背景做的（subagent、背景 shell／Monitor／Workflow）即時變成畫面上的圖，有動畫感、可點、專業的視覺（`docs/DESIGN.md`）。hello／clock 只在 `TELLTALE_DEV=1` 註冊。
+
+| 編號 | 行為（給 X 要得到 Y） | 驗收（硬性、二元） | 評測法 |
+|---|---|---|---|
+| 10 | 純函式層：`hooks/live.ts`（`composeLive`、`laneBar`、時間格式）、`hooks/agents-model.ts`（`sortAgents`、`collapseLeaves`、`fitRows`） | I14／I15 單元＋property 測試；DESIGN §1 每個符號與時間格式各一測；突變：bar 視窗、elapsed 裁切、running 優先 | exact＋property |
+| 11 | 段位（§1.2 規則 8）＋ `size.<id>` ＋ 標題列點擊改成循環段位；hello／clock 無 stages 仍是開關 | layout 測試：summary→(0,0)、full→rest 仍受 I2；hit 測試：有 stages 的面板點標題 post stage、沒有的 post toggle | exact |
+| 12 | 觀察型 hooks：`turn.*`、`ui.render{Spinner}`、`session.receive{task-notification}` 寫 `agents.turn`／`agents.tasks`／pendingSpawns；全部 `return next(e)` | I13 流程測試（每事件一測＋next 恰好一次）；I17；validate 的 hooks 行 exact（I12） | exact |
+| 13 | agents 面板 poll：`io.agents` 注入、`agents.seen` 生命週期（firstAt／endAt／60 s 清／failed 留）、model 對回、`$.env.get("TELLTALE_DEV")` 決定 PANELS | I16；model 配對三案例（配到、配不到、同名兩個取最早）；`calls:` exact（I12）；userConfig 刪除後 validate 仍過 | exact |
+| 14 | agents view：tree 排版（主迴圈流程列、樹、聚合、fitRows）＋ `title(data)` 摘要 | DESIGN §3.2 的圖逐列 exact（columns 120、rows 6）；rows 3／1／0 各一案例；I4 | exact |
+| 15 | agents view：lanes 排版（bar、刻度列只在 full）＋ `/telltale agents view|size|clear` | DESIGN §3.1 的圖逐列 exact；§1.6 v0.2 表每列一測 | exact |
+| 16 | `band.tsx`：幀時鐘動畫、`live` 列重畫、row／view／stage 點擊、flash | tmux：派一個 subagent＋一個背景 Bash → 兩條 lane 出現、spinner 在轉（連拍 3 張 capture 字元不同）、結束後 `✓` 60 s 後消失、失敗列點掉；每幀 `composeLive` 全滿量 < 5 ms（log 或 `ui.log` 印）；debug log 無 `does not validate|hook failed|refused` | 手動＋腳本 |
+| 17 | 詳情展開（row 點擊）、失敗列 dismiss、`agents.expanded` 單一 | onRow 純函式測試；tmux 點兩列只展開一列 | exact＋手動 |
+| 18 | README v0.2（validate 兩行更新、agents 面板說明、TELLTALE_DEV、背景任務用 description 配對的限制、孤兒規則）、DESIGN.md 定稿、寬度 200→30 重跑 | `test_readme` 綠；切片 8 腳本重跑全 ok；CI 綠 | CI＋腳本 |
+
+品質條件（DESIGN.md 是參考樣本；挑毛病前使用者要在 DESIGN §4 選風格 A／B／C）：
+- 「有動畫感」的可觀察定義：running 列 spinner 每 80 ms 換字元（tmux 連拍 3 張至少 2 張不同）、elapsed 每秒 +1、狀態切換那列 1 s 內粗體。
+- 「專業」的可觀察定義：顏色只表嚴重度（DESIGN §0-1）、沒有空白分隔列、任何寬度 ≥ 20 每列 ≤ columns、符號表全部出自 DESIGN §1，沒有表外符號。
+
 ### 評測法
 本專案沒有 LLM 成分，只有 exact match（單元／流程）與手動 tmux 實測；沒有評測層。
 
 ## 工具與環境約束（實作者與審查者每張票都會收到這一節）
 
 - 程式碼與註解英文；docs／票中文。
-- `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude --plugin-dir "$PWD" --debug-file <f>` 開發；存檔熱重載。
-- 型別來源：`.claude/types/claude-code.d.ts`（`/plugin-types` 產，不手改；進版控方便 CI 型別檢查）。
+- `claude --plugin-dir "$PWD/plugins/telltale" --debug-file <f>` 開發（旗標已在 settings.json env）；存檔熱重載。平常 `~/.claude/skills/telltale` symlink 自動載入。
+- 型別來源：`.claude/types/claude-code.d.ts`（`/plugin-types` 產，不手改；**不進版控**，clone 後自己產）。
 - `tsconfig.json` 照型別檔檔頭；含 JSX 的檔一律 `.tsx`。
 - 測試：`bun test tests/hooks/`；閘：`make check`（Python 的 scripts 層 + validate + bun test）；突變：`make mutate`（`scripts/突變.py` 對 §5 表的每一條改壞一行跑 `bun test`，全綠即失敗）。
-- 不准：`$.process.*`、`$.fs.*`、`$.http.*`、hook `tool.call`／`classic.*`（I9）。
+- 不准：`$.process.*`、`$.fs.*`、`$.http.*`、hook `tool.call`／`classic.*`（I9）。v0.2 准的只多 `$.agent.list`、`$.env.get` 與 I12 列的觀察型事件。
 - 手動實測用 tmux（題目 §5.3），每次都 grep debug log。
 
 ## 挑毛病紀錄
 
 - 第 1 輪（2026-09-17）：三個對抗 agent 共 34 條；定義類 30 條已補進上文（§1.1 view 不回 null、§1.2 規則 1/2/4/7、§1.3 下界、§1.5 columnsHint／TITLE_RESERVE／死區／合併列、§1.6 unchanged／help、§2.1 `error.<id>`、§2.5 卸載、§4 I7 只認 tmux、I11、切片 1/3/5/6/8/9 的驗收加嚴）。偏好類 4 條問使用者：Q1 v0.1 面板數 → hello + clock；Q2 開關多 session 語意 → 全域共用；Q3 hello 的 tone 示範 → 奇偶 up/flat + dim；Q4 全部關掉 → 縮成一列。「AI 補的哪些第一版不要」→ 全部做。
 - 第 2 輪起依 `~/.claude/rules/額度.md`（對抗式只跑 1 輪）由主 agent 直接補定義，不再派 agent。**挑毛病：1 輪，未解 0。**
+- v0.2（agents 面板）：訪談 2026-09-17 完成，**挑毛病：待跑**（使用者先選 DESIGN §4 風格）。
