@@ -44,3 +44,4 @@ Single-context：根目錄 `CONTEXT.md` ＋ `docs/adr/`（缺就略過，由 dom
 - `mattpocock-skills:to-tickets` 沒裝在這台（plugin 只裝了部分 skill），票照 `docs/tasks/00-範本.md` 手寫。
 - 〔票 01 實測〕`userConfig` 的鍵不能含 `.`（`panel.hello` → `Invalid input`）；plugin 根目錄有 `CLAUDE.md` 在 `validate --strict` 會 exit 1，所以本檔住 `.claude/CLAUDE.md`。`.gitignore` 不支援行內 `# 註解`（會變成 pattern 的一部分）。
 - 〔票 01 實測〕`e.viewport.columns` = 終端寬（150 欄回 150），`maxRows` 在 34 列終端回 9。
+- 「加一個新面板」的 checklist 等下一輪開 git 面板時做成 `.claude/skills/新面板/`（2026-09-17 裁定，三次法則）；這輪不做。
