@@ -4,6 +4,7 @@ export const BAND_ROWS_MAX = 9; // sole source of truth; title 1 + content + sta
 export const FIXED_ROWS = 2; // title row + status row
 export const CONTENT_ROWS_MAX = BAND_ROWS_MAX - FIXED_ROWS; // derived, not a second literal
 export const MIN_COLUMNS = 20; // narrower than this: whole band draws as a single row (§1.5)
+export const PANEL_TITLE_ROWS = 1; // every drawn panel spends one row on its `─ label ─` title (§1.5)
 
 export type Want = { id: string; minRows: number; wantRows: number };
 export type Slot = { id: string; rows: number };
@@ -26,15 +27,15 @@ export const layout = (panels: readonly Want[], maxRows: number): Layout => {
     };
   }
 
-  // Rule 3: first pass — each panel claims minRows in input order, or is dropped whole (never half).
+  // Rule 3: first pass — each panel claims its title row + minRows in input order, or is dropped whole (never half).
   const slots: Slot[] = [];
   const dropped: string[] = [];
   let remaining = budget;
   const wantRowsById = new Map<string, number>();
   for (const p of panels) {
-    if (p.minRows <= remaining) {
+    if (PANEL_TITLE_ROWS + p.minRows <= remaining) {
       slots.push({ id: p.id, rows: p.minRows });
-      remaining -= p.minRows;
+      remaining -= PANEL_TITLE_ROWS + p.minRows;
       wantRowsById.set(p.id, p.wantRows);
     } else {
       dropped.push(p.id);
@@ -52,6 +53,7 @@ export const layout = (panels: readonly Want[], maxRows: number): Layout => {
     }
   }
 
-  const total = FIXED_ROWS + slots.reduce((n, s) => n + s.rows, 0);
+  // Rule 5: total counts the fixed rows plus, per drawn panel, its title row and its content rows.
+  const total = FIXED_ROWS + slots.reduce((n, s) => n + PANEL_TITLE_ROWS + s.rows, 0);
   return { slots, dropped, total };
 };

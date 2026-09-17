@@ -86,13 +86,13 @@ export const layout = (panels: readonly Want[], maxRows: number): Layout;
 規則（每條都有測試與突變）：
 1. `budget = min(maxRows, BAND_ROWS_MAX) - FIXED_ROWS`，**算一次、是常數**，不隨分配遞減後重判。
 2. `budget < 1`（含 `maxRows ≤ FIXED_ROWS`、`maxRows ≤ 0`）：`slots = []`、全部進 `dropped`、`total = max(1, min(maxRows, FIXED_ROWS))`。`total === 1` 時 band 把標題與狀態合併成一列（§1.5）。
-3. 依 `panels` 順序，每個面板先拿 `minRows`（從 `budget` 扣）；扣不起的整個進 `dropped`，**不畫半個**，繼續看下一個（後面較小的面板仍可能塞進去）。
+3. 依 `panels` 順序，每個面板先拿 `PANEL_TITLE_ROWS (=1) + minRows`（從 `budget` 扣；那一列是 §1.5 的 `─ label ─` 標題列，**票 06 實測漏算過，狀態列蓋掉了 clock 的標題**）；扣不起的整個進 `dropped`，**不畫半個**，繼續看下一個（後面較小的面板仍可能塞進去）。
 4. 第一輪分完剩下的列，再依順序補到各面板的 `wantRows` 為止；補不完就留白（`total` 可以小於上限，用 `≤` 不用 `=`）。
-5. `total = FIXED_ROWS + Σ slots.rows ≤ min(maxRows, BAND_ROWS_MAX)`（規則 2 的情況除外，那時 `total ≤ FIXED_ROWS`）。
+5. `total = FIXED_ROWS + Σ (PANEL_TITLE_ROWS + slots.rows) ≤ min(maxRows, BAND_ROWS_MAX)`（規則 2 的情況除外，那時 `total ≤ FIXED_ROWS`）。`slot.rows` 是內容列數，不含標題列。
 6. 輸出確定：同輸入同輸出；`slots` 順序 = 輸入順序；`dropped` 順序 = 輸入順序。
 7. `layout` **不吃 columns**：寬度改變永遠不改變高度。帶子高度只在「maxRows 變」或「開關變」時變（回答使用者「resize 時高度跳動」的顧慮）。
 
-預設狀態的高度（v0.1，只有 hello 開著）：`FIXED_ROWS + hello.wantRows = 2 + 2 = 4` 列，寫進 README。
+預設狀態的高度（v0.1，hello 與 clock 都開）：`FIXED_ROWS + (1 + hello.wantRows) + (1 + clock.wantRows) = 2 + 3 + 2 = 7` 列，寫進 README。
 
 #### 1.3 顯示寬度（`hooks/width.ts`）：純函式
 

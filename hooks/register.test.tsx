@@ -98,9 +98,9 @@ test("I10: render before any data still draws every panel's placeholder", async 
   expect(p.panels[1]!.lines[0]!.text).toBe("--:--:--");
 });
 
-test("layout is applied: maxRows 3 keeps hello (1 row) and reports clock as dropped", async () => {
+test("layout is applied: maxRows 4 keeps hello (title + 1 row) and reports clock as dropped", async () => {
   const eng = await boot();
-  const p = clientOf(await render(eng, { maxRows: 3 }))!.props.props as {
+  const p = clientOf(await render(eng, { maxRows: 4 }))!.props.props as {
     panels: { id: string; rows: number }[];
     dropped: string[];
     total: number;
@@ -108,7 +108,7 @@ test("layout is applied: maxRows 3 keeps hello (1 row) and reports clock as drop
   expect(p.panels).toHaveLength(1);
   expect(p.panels[0]).toMatchObject({ id: "hello", rows: 1 });
   expect(p.dropped).toEqual(["clock"]);
-  expect(p.total).toBe(3);
+  expect(p.total).toBe(4);
 });
 
 test("I4/I11: every line handed to the Client fits the viewport, CJK counted 2; at least one line shown", async () => {
