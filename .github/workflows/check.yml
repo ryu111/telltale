@@ -1,10 +1,12 @@
-# CI 只跑 make check（scripts/ 的 Python 閘）；plugin 本體的閘在 harness 票加進來。
+# CI runs make check (the Python gate) plus the plugin gate (bun test + validate --strict)
+# and make mutate (mutation tests). No LLM step: the eval layer stays out of CI on purpose.
 name: check
 on:
   pull_request:
   push:
     branches: [main]
-# 同一分支新 push 就取消還在跑的舊 run：mutate 很吃時間，舊的跑完也沒人看。
+# A new push on the same branch cancels the run still in flight: mutate is slow and nobody
+# looks at a superseded run's result.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -14,6 +16,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
+      - uses: oven-sh/setup-bun@v2
+      - run: npm install -g @anthropic-ai/claude-code
       - run: uv sync
       - run: make check
-
+      - run: make mutate
