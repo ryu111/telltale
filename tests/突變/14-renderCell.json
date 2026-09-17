@@ -1,0 +1,26 @@
+[
+  {
+    "label": "renderCell: a line is allowed to overflow w (I4 broken)",
+    "file": "plugins/telltale/hooks/cells.ts",
+    "old": "pad(fit(name, NODE_W - 4), NODE_W - 4)",
+    "new": "name"
+  },
+  {
+    "label": "renderCell: finished cell keeps kind-tones instead of greyDeep",
+    "file": "plugins/telltale/hooks/cells.ts",
+    "old": "cell.status !== \"running\" ? \"greyDeep\" : ",
+    "new": "false ? \"greyDeep\" : "
+  },
+  {
+    "label": "renderStrip: overflow count is silently dropped",
+    "file": "plugins/telltale/hooks/cells.ts",
+    "old": "out.push(`+${names.length - shown.length}`)",
+    "new": "void names;"
+  },
+  {
+    "label": "renderMainHistory: turn count not shown",
+    "file": "plugins/telltale/hooks/cells.ts",
+    "old": "`✓ ${count} turns · `",
+    "new": "`✓ turns · `"
+  }
+]
