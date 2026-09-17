@@ -51,6 +51,20 @@ const isRowMessage = (data: unknown): data is RowMessage =>
 
 const stagesOf = (p: Panel): Stages | undefined => p.stages;
 
+// Ticket 23: whether any active panel is currently erroring — read before
+// `layout()` runs so it can force the status row on even when nothing got
+// dropped for height (SDD §1.2). A top-level function for the same
+// `claude plugin validate --strict` reason `buildBandProps` already
+// documents below (it only follows `$` into a function named at the top of
+// this file).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function anyPanelErroring(active: readonly Panel[], $: any): Promise<boolean> {
+  const errors = await Promise.all(
+    active.map(async (p) => ((await $.store.get(`error.${p.id}`)) as string | undefined) ?? ""),
+  );
+  return errors.some((error) => error !== "");
+}
+
 // Ticket 16: shared by both `ui.render` sites (AbovePrompt and Pane) —
 // the same `props` algorithm regardless of which surface ends up drawing
 // it, only `maxRows`/`viewport.columns` differ per call site. A top-level
@@ -78,7 +92,8 @@ async function buildBandProps(active: readonly Panel[], $: any, maxRows: number,
       }),
   );
 
-  const { slots, dropped, total } = layout(wants, maxRows);
+  const status = await anyPanelErroring(active, $);
+  const { slots, dropped, total, status: statusRow } = layout(wants, maxRows, { status });
   const columnsForView = Math.max(MIN_COLUMNS, viewportColumns ?? 80);
   const now = await $.clock.now();
 
@@ -128,6 +143,7 @@ async function buildBandProps(active: readonly Panel[], $: any, maxRows: number,
             panels: bandPanels,
             dropped,
             now,
+            status: statusRow,
           } satisfies BandProps;
 }
 
@@ -315,8 +331,11 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
       .map((p) => ({ id: p.id, minRows: p.minRows, wantRows: p.wantRows }));
     // No live viewport reaches a command.run hook, so the band line reports
     // against the framework's own ceiling (BAND_ROWS_MAX) rather than a
-    // terminal size it doesn't have.
-    const { slots, dropped, total } = layout(wants, BAND_ROWS_MAX);
+    // terminal size it doesn't have. Ticket 23: same error flag as
+    // `buildBandProps` so this reports the same row budget the real render
+    // would use.
+    const errorStatus = await anyPanelErroring(active, $);
+    const { slots, dropped, total } = layout(wants, BAND_ROWS_MAX, { status: errorStatus });
     const sizes: Record<string, Stage> = Object.fromEntries(
       await Promise.all(
         active

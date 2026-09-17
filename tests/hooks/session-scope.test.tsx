@@ -44,5 +44,5 @@ test("agents panel defaults to the full stage; a demo panel still defaults to co
   await eng.fire("session.start", {});
   const tree = await eng.fire("ui.render", { surface: "terminal", component: "AbovePrompt", viewport: { columns: 120 }, props: { hasSurvey: false, maxRows: 9 } });
   const props = clientOf(tree)!.props.props as { panels: { id: string; rows: number }[] };
-  expect(props.panels.find((p) => p.id === "agents")?.rows).toBe(6); // full = rest of the 9-row budget
+  expect(props.panels.find((p) => p.id === "agents")?.rows).toBe(7); // full = rest of the 9-row budget (ticket 23: no status row when nothing is dropped)
 });

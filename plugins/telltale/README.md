@@ -148,7 +148,7 @@ someone has to arbitrate the shared space.
 
 ## Known limitations
 
-- **Default height is 7 rows**: `FIXED_ROWS (2) + (1 title + hello's 2 rows) + (1 title + clock's 1 row)` with both panels on, capped at `BAND_ROWS_MAX = 9`.
+- **Default height is 9 rows**: `agents` alone, at its default `full` stage: `TITLE_ROWS (1) + (1 title + 7 rows) = 9`, capped at `BAND_ROWS_MAX = 9`. The status row is not part of that budget — it only appears (taking one row away from panel content) when a panel got dropped for height or a panel is erroring; the rest of the time that row goes back to panel content.
 - **The rightmost 4 columns are a dead zone.** `TITLE_RESERVE = 4` (3 columns the engine's own `[-]` control covers, plus 1 column of buffer) is reserved on every title row and excluded from clicks — clicking there never toggles a panel.
 - **Emoji width is not guaranteed.** `displayWidth`/`fit` size East-Asian wide/fullwidth characters at 2 columns and everything else at 1; emoji are out of scope for v0.1 and may measure wrong.
 - **Narrower than 20 columns degrades to one line.** Below `MIN_COLUMNS = 20` the whole band collapses to a single `telltale · N panels` line instead of drawing any panel.
