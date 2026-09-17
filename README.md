@@ -81,7 +81,7 @@ someone has to arbitrate the shared space.
 - **Emoji width is not guaranteed.** `displayWidth`/`fit` size East-Asian wide/fullwidth characters at 2 columns and everything else at 1; emoji are out of scope for v0.1 and may measure wrong.
 - **Narrower than 20 columns degrades to one line.** Below `MIN_COLUMNS = 20` the whole band collapses to a single `telltale · N panels` line instead of drawing any panel.
 - **Panel on/off is shared by every session for this user**, the same way `/config` is: turning `hello` off in one session turns it off for all of that person's sessions, not per-session.
-- **`$.store` lives on disk at `~/.claude/plugins/store/`**, one JSON file per plugin (named `telltale_<something>.json` — the exact infix depends on how the plugin was loaded), outside `${CLAUDE_PLUGIN_DATA}`. `claude plugin uninstall telltale` does not delete it. To reset telltale's state (panel toggles, cached poll data) by hand:
+- **`$.store` lives on disk at `~/.claude/plugins/store/`**, one JSON file per plugin, named after its provenance (`telltale_inline-<hash>.json` for a `--plugin-dir` checkout, `telltale_<marketplace>-<hash>.json` when installed), outside `${CLAUDE_PLUGIN_DATA}`. `claude plugin uninstall telltale` does not delete it. To reset telltale's state (panel toggles, cached poll data) by hand:
 
   ```bash
   rm ~/.claude/plugins/store/telltale_*.json
