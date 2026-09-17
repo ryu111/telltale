@@ -1,37 +1,29 @@
 [project]
-name = "myproject"                 # 改成你的專案名（PEP 508：ASCII）
+name = "telltale"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = []
+# The plugin itself is TypeScript under hooks/ and ships with no Python.
+# This file only pins the dev tooling for the ticket runner in scripts/.
 
 [dependency-groups]
 dev = [
     "pytest>=8",
     "ruff>=0.6",
     "mypy>=1.11",
-    "mutmut>=3",
-    "hypothesis>=6",
     "pytest-xdist>=3",
     "pytest-timeout>=2.4.0",
 ]
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/專案"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--import-mode=importlib -q"
 timeout = 300  # pytest-timeout：一支測試卡住不能卡死整條 check 與 xdist worker
-markers = ["llm: 真 LLM，非確定，不進 CI"]
 
 [tool.ruff]
 line-length = 100
-src = ["src", "tests"]
-extend-exclude = ["docs", "mutants", ".hypothesis"]  # mutants/ 與 .hypothesis/ 是工具的工作目錄
+src = ["scripts", "tests"]
+extend-exclude = ["docs", "hooks", "node_modules"]
 
 [tool.ruff.lint]
 # KISS／SRP／YAGNI 能機械化的部分：複雜度、參數數量、分支數、死程式碼、未用參數。
@@ -62,12 +54,6 @@ convention = "google"
 "tests/**" = ["S101", "D100", "D101", "D102", "D103", "FBT001", "FBT002", "FBT003", "PLR2004", "ANN401", "SLF001", "S603", "S607", "PLR1714", "PLC0415"]
 
 [tool.mypy]
-strict = true                       # 唯一能機械檢查里氏替換與介面隔離的東西
-files = ["src", "tests", "scripts"]
-mypy_path = "src:scripts"
-exclude = ["^mutants/", "^\\.hypothesis/"]
-
-[tool.mutmut]
-source_paths = ["src/"]
-pytest_add_cli_args_test_selection = ["tests/單元", "tests/流程"]
-also_copy = [".gitignore", ".claude/hooks", "scripts"]  # 骨架、hook、跑票 的測試在 mutants/ 裡也要讀得到
+strict = true
+files = ["tests", "scripts"]
+mypy_path = "scripts"

@@ -12,3 +12,5 @@ secrets/
 .hypothesis/
 .worktrees/
 .claude/跑票紀錄.jsonl   # 跑票.py 每票 append 的報告；不進版控，否則下一票前置站會判「主目錄不乾淨」
+node_modules/
+.claude/settings.local.json   # 本機開發偏好（enabledPlugins），不進版控

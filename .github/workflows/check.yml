@@ -1,4 +1,4 @@
-# CI 只擋前兩層（單元、流程）＋ mutation 門檻。評測層（真 LLM）不進 CI。
+# CI 只跑 make check（scripts/ 的 Python 閘）；plugin 本體的閘在 harness 票加進來。
 name: check
 on:
   pull_request:
@@ -16,4 +16,4 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - run: uv sync
       - run: make check
-      - run: make mutate
+
