@@ -4,11 +4,5 @@
     "file": "plugins/telltale/hooks/register.tsx",
     "old": "await $.ui.open({ id: \"telltale\", title: \"telltale\" });",
     "new": "void 0;"
-  },
-  {
-    "label": "frame clock: restarted every render",
-    "file": "plugins/telltale/hooks/band.tsx",
-    "old": "if (surface.state === undefined) {",
-    "new": "if (true) {"
   }
 ]

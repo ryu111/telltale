@@ -147,3 +147,7 @@ body——但具體數字不同，這裡記的是本票在 2.1.274 上重測的�
    render 之間、camera 用哪個 props 計算」這麼窄的窗口，沒有另外開票，只在這裡記一筆。
 4. `backgroundColor` 在目前的引擎／終端組合下量不到效果（見 item 2）；`Text` 這個 prop 保留在程式碼裡，沒有因為這次
    量不到就拔掉，因為 SDD／DESIGN 定義它，且不是「錯」而是「環境限制」（256 色、無 truecolor）。
+
+## 沒有機制守的（明寫，不留在中間）
+
+- `band.tsx` 的幀時鐘啟動守衛（`surface.every(80)` 只掛一次）**沒有自動測試**：band.tsx 從票 06 起就只靠 tmux 手動驗。原本票 16 的第 2 條突變因此全綠，已從 `tests/突變/16-band-cells.json` 拿掉；改壞它的症狀是每次 render 多掛一個 timer、CPU 慢慢上升，要用 tmux 開 2 分鐘看 debug log 的 settled 時間有沒有變長。
