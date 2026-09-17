@@ -93,10 +93,12 @@ test("agents * with no agents panel registered: treated as unknown id, not a cra
 // ── onRow (pure) ──
 
 test("onRow dismisses a failed/killed/orphan cell and leaves expanded null", () => {
-  const cells: Cells = { c: { id: "c", kind: "sub", label: "sub", desc: "", status: "failed", firstAt: 0, updatedAt: 0, steps: [] } };
-  const out = onRow("c", cells, 1000);
-  expect(out.cells.c.dismissed).toBe(true);
-  expect(out.expanded).toBeNull();
+  for (const status of ["failed", "killed", "orphan"] as const) { // all three, so narrowing to one status turns red
+    const cells: Cells = { c: { id: "c", kind: "sub", label: "sub", desc: "", status, firstAt: 0, updatedAt: 0, steps: [] } };
+    const out = onRow("c", cells, 1000);
+    expect(out.cells.c.dismissed).toBe(true);
+    expect(out.expanded).toBeNull();
+  }
 });
 
 test("onRow expands a completed cell", () => {
