@@ -1,0 +1,26 @@
+[
+  {
+    "label": "agents poll: sub status change does not push reply",
+    "file": "plugins/telltale/hooks/panels/agents.ts",
+    "old": "const nodeName = newStatus === \"completed\" ? \"reply\" : newStatus;",
+    "new": "const nodeName = newStatus;"
+  },
+  {
+    "label": "agents poll: vanish uses collapse constant",
+    "file": "plugins/telltale/hooks/panels/agents.ts",
+    "old": "now - cell.endAt >= VANISH_AFTER_MS",
+    "new": "now - cell.endAt >= COLLAPSE_AFTER_MS"
+  },
+  {
+    "label": "model pairing: reuses a consumed pending spawn",
+    "file": "plugins/telltale/hooks/panels/agents.ts",
+    "old": "const [spawn] = pending.splice(bestIdx, 1);",
+    "new": "const spawn = pending[bestIdx];"
+  },
+  {
+    "label": "TELLTALE_DEV: dev-only panels always active",
+    "file": "plugins/telltale/hooks/register.tsx",
+    "old": "active = panels.filter((p) => !DEV_ONLY_PANEL_IDS.has(p.id) || dev === \"1\");",
+    "new": "active = panels.filter((p) => DEV_ONLY_PANEL_IDS.has(p.id) || dev === \"1\");"
+  }
+]

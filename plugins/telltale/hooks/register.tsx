@@ -1,6 +1,7 @@
 // hooks module. SDD §1.4, §3. The only place in this plugin that touches `$`.
 // Allowed `$` calls (00-共同規則 / SDD §1.4): $.ui.resolve, $.ui.invalidate,
-// $.clock.now, $.clock.every, $.store.get, $.store.set, $.command.register.
+// $.clock.now, $.clock.every, $.store.get, $.store.set, $.command.register,
+// $.agent.list, $.env.get.
 
 import type { On, PluginOptions, Register } from "claude-code";
 import { runTelltale, type TelltaleState } from "./command";
@@ -39,10 +40,12 @@ const isStageMessage = (data: unknown): data is StageMessage =>
   (data as { kind?: unknown }).kind === "stage" &&
   typeof (data as { id?: unknown }).id === "string";
 
-// SDD §1.1a: `panel.ts`'s `Panel<D>` doesn't have a formal `stages` field yet
-// (that lands with ticket 13 or later); until then, every read of it here
-// goes through this assertion.
-const stagesOf = (p: Panel): Stages | undefined => (p as { stages?: Stages }).stages;
+const stagesOf = (p: Panel): Stages | undefined => p.stages;
+
+// Ticket 13 §2.7: hello/clock are dev-only scaffolding, gated behind
+// `TELLTALE_DEV=1`. A panel doesn't know this about itself (framework
+// policy, not panel data) — see `Panel<D>` in panel.ts, which has no such flag.
+const DEV_ONLY_PANEL_IDS = new Set(["hello", "clock"]);
 
 // `claude plugin validate --strict` requires the exported `register`'s own
 // declaration to be a literal function that hands `on` straight to a
@@ -52,24 +55,31 @@ const stagesOf = (p: Panel): Stages | undefined => (p as { stages?: Stages }).st
 // this plain top-level function, and both `register` and `makeRegister`
 // below just forward into it with a different `panels` list.
 const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions): void => {
-  const byId = new Map(panels.map((p) => [p.id, p] as const));
+  // Ticket 13 §2.7: which panels are live this session — everything until
+  // `TELLTALE_DEV=1` is checked in session.start, then narrowed. `$` only
+  // exists inside a hook (SDD §2.7's "register 時讀" is imprecise — flagged
+  // to the parent), so this starts as the full list and session.start
+  // narrows it before anything else runs.
+  let active: readonly Panel[] = panels;
+  const byId = (): Map<string, Panel> => new Map(active.map((p) => [p.id, p] as const));
 
   // Ticket 12 §2.6a: spawns seen via turn.step's Agent tool uses, kept in
-  // memory (not `$.store` — SDD §2.6) until ticket 13's poll pairs them up
-  // against `$.agent.list()`. Not consumed by this ticket; `takePending` is
-  // declared here for ticket 13 to wire in.
+  // memory (not `$.store` — SDD §2.6) until the agents panel's poll pairs
+  // them up against `$.agent.list()`.
   let pendingSpawns: PendingSpawn[] = [];
   const takePending = (): PendingSpawn[] => {
     const out = pendingSpawns;
     pendingSpawns = [];
     return out;
   };
-  void takePending;
 
   on("session.start", async ($, e, next) => {
+    const dev = await $.env.get("TELLTALE_DEV");
+    active = panels.filter((p) => !DEV_ONLY_PANEL_IDS.has(p.id) || dev === "1");
+
     const existing = (await $.store.get("panels")) as Record<string, boolean> | undefined;
     const panelsState: Record<string, boolean> = { ...existing };
-    for (const p of panels) {
+    for (const p of active) {
       if (!(p.id in panelsState)) {
         const seed = options[`panel_${p.id}`];
         panelsState[p.id] = typeof seed === "boolean" ? seed : p.defaultOn;
@@ -83,20 +93,41 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
       argumentHint: "[status|help|on|off|<panel> [on|off]]",
     });
 
-    for (const p of panels) {
+    for (const p of active) {
       if (!p.poll) continue;
       // Named after the panel id so fakeEngine's `tick(id)` can find this
       // exact closure again later (SDD §4 test harness; no 8th `$` op needed).
       const runTick = Object.defineProperty(
         async (): Promise<void> => {
           try {
-            const data = await p.poll!({ now: () => $.clock.now() });
-            const bytes = new TextEncoder().encode(JSON.stringify(data)).length;
-            if (bytes > DATA_MAX_BYTES) {
-              await $.store.set(`error.${p.id}`, "data too large");
+            // Model pairing (§2.6 step 3): an unmatched pending spawn isn't
+            // dropped this tick — whatever `poll` leaves in `pendingThisTick`
+            // (agents.ts's `applyModelPairing` splices it as it consumes
+            // entries) goes back onto the shared queue below.
+            const pendingThisTick = p.needsAgents ? takePending() : [];
+            const io = p.needsAgents
+              ? {
+                  now: () => $.clock.now(),
+                  agents: () => $.agent.list(),
+                  cells: async () => ((await $.store.get("agents.cells")) as Cells | undefined) ?? {},
+                  takePending: () => pendingThisTick,
+                }
+              : { now: () => $.clock.now() };
+            const data = await p.poll!(io);
+            if (p.needsAgents) pendingSpawns.unshift(...pendingThisTick);
+            if (p.id === "agents") {
+              // §2.1: the agents panel's poll result IS `agents.cells`, not
+              // `data.agents` — no 64 KiB check, no `error.agents` (a poll
+              // failure just throws and the catch below handles it).
+              await $.store.set("agents.cells", data);
             } else {
-              await $.store.set(`data.${p.id}`, { at: await $.clock.now(), data });
-              await $.store.set(`error.${p.id}`, "");
+              const bytes = new TextEncoder().encode(JSON.stringify(data)).length;
+              if (bytes > DATA_MAX_BYTES) {
+                await $.store.set(`error.${p.id}`, "data too large");
+              } else {
+                await $.store.set(`data.${p.id}`, { at: await $.clock.now(), data });
+                await $.store.set(`error.${p.id}`, "");
+              }
             }
           } catch (err) {
             await $.store.set(`error.${p.id}`, String(err instanceof Error ? err.message : err));
@@ -118,7 +149,7 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
 
     const panelsState = ((await $.store.get("panels")) as Record<string, boolean> | undefined) ?? {};
     const wants = await Promise.all(
-      panels
+      active
         .filter((p) => panelsState[p.id] ?? p.defaultOn)
         .map(async (p) => {
           if (!stagesOf(p)) return { id: p.id, minRows: p.minRows, wantRows: p.wantRows };
@@ -135,7 +166,7 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
 
     const bandPanels = await Promise.all(
       slots.map(async (slot) => {
-        const p = byId.get(slot.id)!;
+        const p = byId().get(slot.id)!;
         const cached = (await $.store.get(`data.${p.id}`)) as { at: number; data: unknown } | undefined;
         const error = ((await $.store.get(`error.${p.id}`)) as string | undefined) ?? "";
         const view = p.view(cached?.data, columnsForView, slot.rows);
@@ -171,13 +202,14 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
 
   on("ui.message", async ($, e, next) => {
     const data = (e as { data?: unknown }).data;
-    if (isToggle(data) && byId.has(data.id)) {
+    const idx = byId();
+    if (isToggle(data) && idx.has(data.id)) {
       const current = ((await $.store.get("panels")) as Record<string, boolean> | undefined) ?? {};
-      current[data.id] = !(current[data.id] ?? byId.get(data.id)!.defaultOn);
+      current[data.id] = !(current[data.id] ?? idx.get(data.id)!.defaultOn);
       await $.store.set("panels", current);
       $.ui.invalidate("ui.render");
-    } else if (isStageMessage(data) && byId.has(data.id)) {
-      const p = byId.get(data.id)!;
+    } else if (isStageMessage(data) && idx.has(data.id)) {
+      const p = idx.get(data.id)!;
       // A panel without `stages` isn't reachable via titleClickKind's "stage"
       // branch in the real client, but ignore it defensively here too.
       if (stagesOf(p)) {
@@ -196,7 +228,7 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
 
   on("command.run", { command: "telltale" }, async ($, e) => {
     const panelsState = ((await $.store.get("panels")) as Record<string, boolean> | undefined) ?? {};
-    const wants = panels
+    const wants = active
       .filter((p) => panelsState[p.id] ?? p.defaultOn)
       .map((p) => ({ id: p.id, minRows: p.minRows, wantRows: p.wantRows }));
     // No live viewport reaches a command.run hook, so the band line reports
@@ -205,13 +237,13 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
     const { slots, dropped, total } = layout(wants, BAND_ROWS_MAX);
     const sizes: Record<string, Stage> = Object.fromEntries(
       await Promise.all(
-        panels
+        active
           .filter((p) => stagesOf(p))
           .map(async (p) => [p.id, ((await $.store.get(`size.${p.id}`)) as Stage | undefined) ?? "compact"] as const),
       ),
     );
     const state: TelltaleState = {
-      order: panels.map((p) => ({ id: p.id, label: p.label, stages: Boolean(stagesOf(p)) })),
+      order: active.map((p) => ({ id: p.id, label: p.label, stages: Boolean(stagesOf(p)) })),
       panels: panelsState,
       sizes,
       layout: { slots, dropped, total },

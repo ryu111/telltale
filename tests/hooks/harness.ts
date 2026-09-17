@@ -113,6 +113,10 @@ export type FakeEngine = {
   // Ticket 12: the next `fire(event, e)`'s `next(e)` resolves to `value`
   // instead of the default stub, consumed once.
   setNextResult: (event: string, value: unknown) => void;
+  // Ticket 13: live bindings so a test can change what `$.agent.list()`/
+  // `$.env.get()` return between ticks, mirroring `now`'s getter/setter below.
+  agents: FakeAgentInfo[];
+  env: Record<string, string>;
 };
 
 export const fakeEngine = (opts: FakeEngineOpts = {}): FakeEngine => {
@@ -121,8 +125,8 @@ export const fakeEngine = (opts: FakeEngineOpts = {}): FakeEngine => {
   const registered: string[] = [];
   const timers: { ms: number; fn: () => unknown }[] = [];
   const opened: string[] = [];
-  const env: Record<string, string> = { ...(opts.env ?? {}) };
-  const agents: FakeAgentInfo[] = (opts.agents ?? []).map((a) => ({ ...a }));
+  let env: Record<string, string> = { ...(opts.env ?? {}) };
+  let agents: FakeAgentInfo[] = (opts.agents ?? []).map((a) => ({ ...a }));
   let nextOverride: { event: string; value: unknown } | undefined;
   // Keyed by the tick function's `.name`: register.tsx names each panel's
   // tick closure after the panel id (SDD §3), so `tick(id)` can find it
@@ -272,6 +276,20 @@ export const fakeEngine = (opts: FakeEngineOpts = {}): FakeEngine => {
   });
   Object.defineProperty(eng, "invalidations", {
     get: () => state.invalidations,
+    enumerable: true,
+  });
+  Object.defineProperty(eng, "agents", {
+    get: () => agents,
+    set: (value: FakeAgentInfo[]) => {
+      agents = value;
+    },
+    enumerable: true,
+  });
+  Object.defineProperty(eng, "env", {
+    get: () => env,
+    set: (value: Record<string, string>) => {
+      env = value;
+    },
     enumerable: true,
   });
   return eng;

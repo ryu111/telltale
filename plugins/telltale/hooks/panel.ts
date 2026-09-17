@@ -1,7 +1,23 @@
-// Panel contract types. SDD §1.1.
+// Panel contract types. SDD §1.1, §1.1a.
 // Pure data + types only. No `claude-code` import, no `$`.
 
+import type { Stages } from "./layout";
+import type { PendingSpawn } from "./observe";
+
 export type Tone = "up" | "down" | "flat" | "dim";
+
+// Structural stand-in for claude-code's `AgentInfo` (SDD §1.1a; the fields
+// `hooks/panels/agents.ts` reads), spelled out locally so this file stays
+// free of a `claude-code` import.
+export type AgentInfo = {
+  id: string;
+  description: string;
+  type: string;
+  status: string;
+  parentId?: string;
+  spawnedBy?: string;
+  name?: string;
+};
 
 export type PanelLine = {
   text: string; // display width (CJK wide chars count 2) <= given columns; no \n, \t, control chars
@@ -16,6 +32,10 @@ export type PanelView = {
 export type PanelIo = {
   now: () => Promise<number>; // framework passes `() => $.clock.now()` (async since 2.1.274; wrapped, never the bare $.clock.now)
   // v0.1: no panel needs fetch yet. The day one does, validate's `calls:` gains $.http.fetch — update README too.
+  // §1.1a / ticket 13: only injected for panels with `needsAgents: true`; every other panel gets `undefined` here.
+  agents?: () => Promise<AgentInfo[]>;
+  cells?: () => Promise<Record<string, import("./cells").Cell>>;
+  takePending?: () => PendingSpawn[];
 };
 
 export type Panel<D = unknown> = {
@@ -25,6 +45,8 @@ export type Panel<D = unknown> = {
   minRows: number; // >= 1
   wantRows: number; // >= minRows
   everyMs?: number; // present only when poll is present; >= 1000
+  needsAgents?: boolean; // ticket 13: framework injects io.agents/cells/takePending only when true
+  stages?: Stages; // v0.2, SDD §1.2 rule 8
   poll?: (io: PanelIo) => Promise<D>; // return value round-trips through JSON into $.store
   view: (data: D | undefined, columns: number, rows: number) => PanelView; // pure function
 };

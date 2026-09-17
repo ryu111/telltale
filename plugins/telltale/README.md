@@ -50,7 +50,7 @@ Pasted verbatim from `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin validate
 
 ```text
 register.tsx hooks: session.start, ui.render{component=AbovePrompt}, ui.message, command.run{command=telltale}, turn.start, turn.step, turn.complete, ui.render{component=Spinner}, session.receive{origin has {kind=task-notification}}
-register.tsx calls: $.clock.every, $.clock.now, $.command.register, $.store.get, $.store.set, $.ui.invalidate, $.ui.resolve
+register.tsx calls: $.agent.list, $.clock.every, $.clock.now, $.command.register, $.env.get, $.store.get, $.store.set, $.ui.invalidate, $.ui.resolve
 ```
 
 ## Design tradeoffs
