@@ -41,6 +41,15 @@ const applyAgentList = (cells: Cells, list: readonly { id: string; description: 
       continue;
     }
 
+    // Ticket 22: a turn.step-created stub that never got a description, and
+    // whose AgentInfo still reports "" while it's no longer running, is
+    // dropped outright — it never showed anything worth keeping.
+    if (existing.status === "running" && existing.desc === "" && info.description === "" && info.status !== "running") {
+      const { [info.id]: _dropped, ...rest } = working;
+      working = rest;
+      continue;
+    }
+
     // Fill in a turn.step-created stub's desc (never rebuilds an existing cell).
     const withDesc = existing.desc === "" && existing.status === "running" ? { ...existing, desc: info.description } : existing;
 
