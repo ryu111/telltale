@@ -1,0 +1,14 @@
+[
+  {
+    "label": "hit: dead zone ignored",
+    "file": "hooks/hit.ts",
+    "old": "if (x < 0 || x >= columns - TITLE_RESERVE) return null;",
+    "new": "if (x < 0) return null;"
+  },
+  {
+    "label": "hit: title rows off by one",
+    "file": "hooks/hit.ts",
+    "old": "y += 1 + panel.rows;",
+    "new": "y += panel.rows;"
+  }
+]
