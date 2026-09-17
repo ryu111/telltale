@@ -34,3 +34,4 @@ v0.2 檢查（出題者對過）：12／13／16／17 的路徑已改成 `plugins
 - 沒有自動測試守的：`band.tsx` 的繪製（06 手動）、真引擎的不重載（06 手動）、寬度縮放（08 手動）。
 
 批次建議：`make tickets F=docs/tasks/band P=1`（`mutations.json` 共用，先序跑最省事；量到時間再開 P）。
+| 21-真機細修 | §2.1、§2.6、§2.6a、§1.2 規則 8；主 agent 真機實測 | `tests/hooks/session-scope.test.tsx` | observe.ts、panels/agents.ts、register.tsx、panel.ts、cells.ts | 20 |
