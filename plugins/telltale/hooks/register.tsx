@@ -4,7 +4,7 @@
 
 import type { On, PluginOptions, Register } from "claude-code";
 import { runTelltale, type TelltaleState } from "./command";
-import { BAND_ROWS_MAX, layout, MIN_COLUMNS } from "./layout";
+import { BAND_ROWS_MAX, layout, MIN_COLUMNS, nextStage, rowsForStage, type Stage, type Stages } from "./layout";
 import type { BandPanel, BandProps } from "./hit";
 import type { Panel } from "./panel";
 
@@ -16,12 +16,24 @@ import { PANELS } from "./panels/index";
 const DATA_MAX_BYTES = 64 * 1024;
 
 type ToggleMessage = { kind: "toggle"; id: string };
+type StageMessage = { kind: "stage"; id: string };
 
 const isToggle = (data: unknown): data is ToggleMessage =>
   typeof data === "object" &&
   data !== null &&
   (data as { kind?: unknown }).kind === "toggle" &&
   typeof (data as { id?: unknown }).id === "string";
+
+const isStageMessage = (data: unknown): data is StageMessage =>
+  typeof data === "object" &&
+  data !== null &&
+  (data as { kind?: unknown }).kind === "stage" &&
+  typeof (data as { id?: unknown }).id === "string";
+
+// SDD §1.1a: `panel.ts`'s `Panel<D>` doesn't have a formal `stages` field yet
+// (that lands with ticket 13 or later); until then, every read of it here
+// goes through this assertion.
+const stagesOf = (p: Panel): Stages | undefined => (p as { stages?: Stages }).stages;
 
 // `claude plugin validate --strict` requires the exported `register`'s own
 // declaration to be a literal function that hands `on` straight to a
@@ -84,9 +96,16 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
     if (e.props.hasSurvey) return next(e);
 
     const panelsState = ((await $.store.get("panels")) as Record<string, boolean> | undefined) ?? {};
-    const wants = panels
-      .filter((p) => panelsState[p.id] ?? p.defaultOn)
-      .map((p) => ({ id: p.id, minRows: p.minRows, wantRows: p.wantRows }));
+    const wants = await Promise.all(
+      panels
+        .filter((p) => panelsState[p.id] ?? p.defaultOn)
+        .map(async (p) => {
+          if (!stagesOf(p)) return { id: p.id, minRows: p.minRows, wantRows: p.wantRows };
+          const stage = ((await $.store.get(`size.${p.id}`)) as Stage | undefined) ?? "compact";
+          const { minRows, wantRows } = rowsForStage(stage);
+          return { id: p.id, minRows, wantRows };
+        }),
+    );
 
     const { slots, dropped, total } = layout(wants, e.props.maxRows as number);
     const viewportColumns = (e.viewport as { columns?: number } | undefined)?.columns;
@@ -106,6 +125,7 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
           lines: view.lines,
           at: cached?.at ?? null,
           error: error === "" ? null : error,
+          stages: Boolean(stagesOf(p)),
         };
       }),
     );
@@ -135,6 +155,20 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
       current[data.id] = !(current[data.id] ?? byId.get(data.id)!.defaultOn);
       await $.store.set("panels", current);
       $.ui.invalidate("ui.render");
+    } else if (isStageMessage(data) && byId.has(data.id)) {
+      const p = byId.get(data.id)!;
+      // A panel without `stages` isn't reachable via titleClickKind's "stage"
+      // branch in the real client, but ignore it defensively here too.
+      if (stagesOf(p)) {
+        const key = `size.${data.id}`;
+        const current = ((await $.store.get(key)) as Stage | undefined) ?? "compact";
+        // Named `toStage`, not `next`: that identifier is reserved by the
+        // hook's own continuation parameter (`claude plugin validate --strict`
+        // rejects shadowing it).
+        const toStage = nextStage(current);
+        await $.store.set(`size.${data.id}`, toStage);
+        $.ui.invalidate("ui.render");
+      }
     }
     return next(e);
   });
@@ -148,9 +182,17 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
     // against the framework's own ceiling (BAND_ROWS_MAX) rather than a
     // terminal size it doesn't have.
     const { slots, dropped, total } = layout(wants, BAND_ROWS_MAX);
+    const sizes: Record<string, Stage> = Object.fromEntries(
+      await Promise.all(
+        panels
+          .filter((p) => stagesOf(p))
+          .map(async (p) => [p.id, ((await $.store.get(`size.${p.id}`)) as Stage | undefined) ?? "compact"] as const),
+      ),
+    );
     const state: TelltaleState = {
-      order: panels.map((p) => ({ id: p.id, label: p.label })),
+      order: panels.map((p) => ({ id: p.id, label: p.label, stages: Boolean(stagesOf(p)) })),
       panels: panelsState,
+      sizes,
       layout: { slots, dropped, total },
       available: BAND_ROWS_MAX,
     };
@@ -158,6 +200,14 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
     const result = runTelltale((e as { args?: string }).args ?? "", state);
     if (result.panels !== state.panels) {
       await $.store.set("panels", result.panels);
+      $.ui.invalidate("ui.render");
+    }
+    if (result.sizes !== state.sizes) {
+      for (const [id, stage] of Object.entries(result.sizes)) {
+        if (state.sizes[id] !== stage) {
+          await $.store.set(`size.${id}`, stage);
+        }
+      }
       $.ui.invalidate("ui.render");
     }
     return { text: result.text };

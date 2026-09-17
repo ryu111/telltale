@@ -18,6 +18,7 @@ export type BandPanel = {
   lines: PanelLine[];
   at: number | null;
   error: string | null;
+  stages?: boolean; // NEW: does this panel support stages (summary/compact/full)?
 };
 export type BandProps = {
   columnsHint: number;
@@ -26,6 +27,11 @@ export type BandProps = {
   dropped: string[];
   now: number;
 };
+
+// What kind of message a title click should post: staged panels cycle their
+// stage, everything else just toggles on/off (SDD §1.5 v0.2 addition).
+export const titleClickKind = (id: string, props: BandProps): "stage" | "toggle" =>
+  props.panels.find((p) => p.id === id)?.stages ? "stage" : "toggle";
 
 // The real engine draws a `[-]` collapse control over the rightmost 3 columns
 // of a Client's title row; +1 column of buffer so a click just left of it

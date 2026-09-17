@@ -1,14 +1,17 @@
 // /telltale command: pure parser + formatter. SDD §1.6.
 // Pure function only — no `claude-code` import, no `$`.
 
+import { STAGE_ORDER, type Stage } from "./layout";
+
 export type TelltaleState = {
-  order: { id: string; label: string }[];
+  order: { id: string; label: string; stages?: boolean }[];
   panels: Record<string, boolean>;
+  sizes: Record<string, Stage>;
   layout: { slots: { id: string; rows: number }[]; dropped: string[]; total: number };
   available: number;
 };
 
-export type TelltaleResult = { text: string; panels: Record<string, boolean> };
+export type TelltaleResult = { text: string; panels: Record<string, boolean>; sizes: Record<string, Stage> };
 
 // Keywords that never double as a panel id (SDD §1.6 table); a second token
 // after one of these is always malformed, never "unknown panel <keyword>".
@@ -21,11 +24,13 @@ const knownIds = (state: TelltaleState): string => state.order.map((p) => p.id).
 const usage = (state: TelltaleState): TelltaleResult => ({
   text: `usage: /telltale [status|help|on|off|<panel> [on|off]]  panels: ${knownIds(state)}`,
   panels: state.panels,
+  sizes: state.sizes,
 });
 
 const unknownPanel = (id: string, state: TelltaleState): TelltaleResult => ({
   text: `unknown panel "${id}"; known: ${knownIds(state)}`,
   panels: state.panels,
+  sizes: state.sizes,
 });
 
 const statusLine = (id: string, label: string, state: TelltaleState): string => {
@@ -56,30 +61,47 @@ const setAll = (to: boolean, state: TelltaleState): TelltaleResult => {
   const panels = changed
     ? { ...state.panels, ...Object.fromEntries(state.order.map((p) => [p.id, to])) }
     : state.panels;
-  return { text: lines.join("\n"), panels };
+  return { text: lines.join("\n"), panels, sizes: state.sizes };
 };
 
 const setOne = (id: string, to: boolean, state: TelltaleState): TelltaleResult => {
   const from = state.panels[id] ?? false;
-  if (from === to) return { text: setLine(id, from, to), panels: state.panels };
-  return { text: setLine(id, from, to), panels: { ...state.panels, [id]: to } };
+  if (from === to) return { text: setLine(id, from, to), panels: state.panels, sizes: state.sizes };
+  return { text: setLine(id, from, to), panels: { ...state.panels, [id]: to }, sizes: state.sizes };
 };
 
 const toggleOne = (id: string, state: TelltaleState): TelltaleResult => {
   const from = state.panels[id] ?? false;
   const to = !from;
-  return { text: setLine(id, from, to), panels: { ...state.panels, [id]: to } };
+  return { text: setLine(id, from, to), panels: { ...state.panels, [id]: to }, sizes: state.sizes };
+};
+
+// SDD §1.6 v0.2 addition: `<id> size` reports the current stage, `<id> size
+// <stage>` sets it. Only meaningful for panels that declared `stages`.
+const sizeStatus = (id: string, state: TelltaleState): TelltaleResult => {
+  const panel = state.order.find((p) => p.id === id);
+  if (!panel?.stages) return usage(state);
+  const current = state.sizes[id] ?? "compact";
+  return { text: `${id}: size ${current}`, panels: state.panels, sizes: state.sizes };
+};
+
+const sizeSet = (id: string, to: Stage, state: TelltaleState): TelltaleResult => {
+  const panel = state.order.find((p) => p.id === id);
+  if (!panel?.stages) return usage(state);
+  const from = state.sizes[id] ?? "compact";
+  if (from === to) return { text: `${id}: size ${from} (unchanged)`, panels: state.panels, sizes: state.sizes };
+  return { text: `${id}: size ${from} → ${to}`, panels: state.panels, sizes: { ...state.sizes, [id]: to } };
 };
 
 export const runTelltale = (args: string, state: TelltaleState): TelltaleResult => {
   const tokens = args.split(/\s+/).filter((t) => t.length > 0);
   const known = new Set(state.order.map((p) => p.id));
 
-  if (tokens.length === 0) return { text: statusText(state), panels: state.panels };
+  if (tokens.length === 0) return { text: statusText(state), panels: state.panels, sizes: state.sizes };
 
   if (tokens.length === 1) {
     const [t0] = tokens as [string];
-    if (t0 === "status") return { text: statusText(state), panels: state.panels };
+    if (t0 === "status") return { text: statusText(state), panels: state.panels, sizes: state.sizes };
     if (t0 === "help") return usage(state);
     if (t0 === "on" || t0 === "off") return setAll(t0 === "on", state);
     if (!known.has(t0)) return unknownPanel(t0, state);
@@ -89,9 +111,24 @@ export const runTelltale = (args: string, state: TelltaleState): TelltaleResult 
   if (tokens.length === 2) {
     const [t0, t1] = tokens as [string, string];
     if (RESERVED.has(t0)) return usage(state);
+    if (t1 === "size") {
+      if (!known.has(t0)) return unknownPanel(t0, state);
+      return sizeStatus(t0, state);
+    }
     if (t1 !== "on" && t1 !== "off") return usage(state);
     if (!known.has(t0)) return unknownPanel(t0, state);
     return setOne(t0, t1 === "on", state);
+  }
+
+  if (tokens.length === 3) {
+    const [t0, t1, t2] = tokens as [string, string, string];
+    if (RESERVED.has(t0)) return usage(state);
+    if (t1 === "size") {
+      if (!known.has(t0)) return unknownPanel(t0, state);
+      if (!(STAGE_ORDER as readonly string[]).includes(t2)) return usage(state);
+      return sizeSet(t0, t2 as Stage, state);
+    }
+    return usage(state);
   }
 
   return usage(state);
