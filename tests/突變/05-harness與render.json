@@ -8,8 +8,8 @@
   {
     "label": "render: dropped not passed to Client",
     "file": "plugins/telltale/hooks/register.tsx",
-    "old": "            dropped,\n            now,\n          } satisfies BandProps",
-    "new": "            dropped: [],\n            now,\n          } satisfies BandProps"
+    "old": "            dropped,\n            now,\n            status: statusRow,\n          } satisfies BandProps",
+    "new": "            dropped: [],\n            now,\n            status: statusRow,\n          } satisfies BandProps"
   },
   {
     "label": "tick: oversized data still stored",
