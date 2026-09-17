@@ -153,8 +153,8 @@ export function Band(props: BandProps, surface: ClientSurface<BandState>): Rende
 | `/telltale <id>` | 切換該面板，回 `hello: on → off` |
 | `/telltale <id> on`／`off` | 設定；已經是該狀態回 `hello: on (unchanged)` |
 | `/telltale on`／`off` | 全部面板，一面板一行同上格式 |
-| `/telltale help`、或任何不合語法的輸入（第三個 token、`on`/`off` 以外的第二個 token） | `usage: /telltale [status|help|on|off|<panel> [on|off]]  panels: hello` |
-| 未知 id | `unknown panel "x"; known: hello`（不猜、不模糊比對） |
+| `/telltale help`、或任何不合語法的輸入（第三個 token、`on`/`off` 以外的第二個 token） | `usage: /telltale [status|help|on|off|<panel> [on|off]]  panels: hello, clock`（面板清單由註冊表動態列出） |
+| 未知 id | `unknown panel "x"; known: hello, clock`（不猜、不模糊比對） |
 
 ### 2. 資料模型
 
