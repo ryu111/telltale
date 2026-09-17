@@ -25,3 +25,13 @@ claude plugin validate --strict .      # calls: 那行只准 $.ui.* $.clock.* $.
 - `claude plugin test` 在 2.1.267 **不存在**（帶 `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` 也沒有；`plugin --help` 只有 validate／eval／init 等）。題目 DoD #2 改成自建 harness。2026-09-17 查：npm latest 是 2.1.274 但 native installer 的 stable channel 停在 2.1.267，`claude update` 不會升。
 - `which claude` 指到 cmux 的 shim（bash script），要 grep 真 binary 看 `~/.local/share/claude/versions/<ver>`。
 - function hooks 相關字串（`AbovePrompt`、`bodyColumns`、`onPointer`、`hooks module`）在 2.1.267 binary 裡都有，機制存在，只是被旗標關著。
+
+## Agent skills
+
+### Issue tracker
+
+Local markdown：spec 在 `docs/SDD.md`，票在 `docs/tasks/<feature>/NN-<slug>.md`。See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context：根目錄 `CONTEXT.md` ＋ `docs/adr/`（缺就略過，由 domain-modeling 懶建）。See `docs/agents/domain.md`.
