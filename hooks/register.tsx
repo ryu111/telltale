@@ -3,7 +3,8 @@
 // $.clock.now, $.clock.every, $.store.get, $.store.set, $.command.register.
 
 import type { On, PluginOptions, Register } from "claude-code";
-import { layout, MIN_COLUMNS } from "./layout";
+import { runTelltale, type TelltaleState } from "./command";
+import { BAND_ROWS_MAX, layout, MIN_COLUMNS } from "./layout";
 import type { Panel } from "./panel";
 import { PANELS } from "./panels/index";
 
@@ -130,6 +131,30 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
       $.ui.invalidate("ui.render");
     }
     return next(e);
+  });
+
+  on("command.run", { command: "telltale" }, async ($, e) => {
+    const panelsState = ((await $.store.get("panels")) as Record<string, boolean> | undefined) ?? {};
+    const wants = panels
+      .filter((p) => panelsState[p.id] ?? p.defaultOn)
+      .map((p) => ({ id: p.id, minRows: p.minRows, wantRows: p.wantRows }));
+    // No live viewport reaches a command.run hook, so the band line reports
+    // against the framework's own ceiling (BAND_ROWS_MAX) rather than a
+    // terminal size it doesn't have.
+    const { slots, dropped, total } = layout(wants, BAND_ROWS_MAX);
+    const state: TelltaleState = {
+      order: panels.map((p) => ({ id: p.id, label: p.label })),
+      panels: panelsState,
+      layout: { slots, dropped, total },
+      available: BAND_ROWS_MAX,
+    };
+
+    const result = runTelltale((e as { args?: string }).args ?? "", state);
+    if (result.panels !== state.panels) {
+      await $.store.set("panels", result.panels);
+      $.ui.invalidate("ui.render");
+    }
+    return { text: result.text };
   });
 };
 

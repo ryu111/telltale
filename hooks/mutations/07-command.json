@@ -1,0 +1,14 @@
+[
+  {
+    "label": "command: unknown id is fuzzy-matched",
+    "file": "hooks/command.ts",
+    "old": "if (!known.has(t0)) return unknownPanel(t0, state);\n    return toggleOne(t0, state);",
+    "new": "return toggleOne(known.has(t0) ? t0 : [...known][0]!, state);"
+  },
+  {
+    "label": "command: set on when already on reports a change",
+    "file": "hooks/command.ts",
+    "old": "if (from === to) return { text: setLine(id, from, to), panels: state.panels };",
+    "new": "if (from === to) return { text: `${id}: ${word(from)} → ${word(to)}`, panels: state.panels };"
+  }
+]
