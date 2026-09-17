@@ -80,3 +80,18 @@ def test_找不到任何型態回none() -> None:
     型態, rows = 量寬度.帶子(["不相干的一行", "另一行"])
     assert 型態 == "none"
     assert rows == []
+
+
+def test_裸型態_沒有狀態列就停在提示分隔線前() -> None:
+    """票 23：沒 dropped／error 就沒有狀態列；帶子到分隔線（整列 ─）前為止，不把提示列算進去。"""
+    lines = [
+        "telltale · 1 panels                          [-]",
+        "─ agents ────────────────────────────────────",
+        "✓ main 8s · 數檔案",
+        "────────────────────────────────────────────────",
+        "❯ 用一個 Explore",
+    ]
+    型態, rows = 量寬度.帶子(lines)
+    assert 型態 == "裸"
+    assert len(rows) == 3
+    assert not any(set(r.rstrip()) == {"─"} for r in rows)

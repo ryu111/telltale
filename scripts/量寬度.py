@@ -41,10 +41,23 @@ def _裸帶子(lines: list[str]) -> list[str] | None:
         return [首]
     out = [首]
     for row in lines[start + 1 :]:
+        # Ticket 23: the status row only exists when something was dropped or errored;
+        # otherwise the band ends right before the prompt separator (a full row of ─) or the prompt.
+        if _是提示分隔線(row) or row.startswith("❯"):
+            break
         out.append(row.rstrip())
-        if row.startswith(("updated", "⋯")) or "too large" in row:
+        if row.startswith("⋯") or "too large" in row:
             break
     return out
+
+
+def _是提示分隔線(row: str) -> bool:
+    """整列只有 `─`（至少 10 格）＝輸入框上方的分隔線，不是帶子的。"""
+    s = row.rstrip()
+    return len(s) >= 分隔線最短 and set(s) == {"─"}
+
+
+分隔線最短 = 10
 
 
 def _inline框帶子(lines: list[str]) -> list[str] | None:
