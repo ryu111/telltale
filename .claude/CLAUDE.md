@@ -19,6 +19,7 @@ claude plugin validate --strict plugins/telltale    # calls: 那行只准 $.ui.*
 claude plugin validate --strict .      # 根目錄是 marketplace（.claude-plugin/marketplace.json），plugin 住 plugins/telltale/
 ```
 一律走 `uv run`，不要先 activate venv。
+型別檔 `.claude/types/claude-code.d.ts` 不進 repo（2026-09-17 裁定）：clone 後在 session 跑 `/plugin-types` 自己產；升版重產。閘不依賴它。
 
 ## 專案級 hook（`.claude/hooks/`）
 - PreToolUse：`docs/tasks/目前` 存在時，Edit／Write 只放行該票「可碰檔案」，其餘 exit 2。

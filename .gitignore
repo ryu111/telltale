@@ -14,5 +14,5 @@ secrets/
 .claude/跑票紀錄.jsonl
 node_modules/
 .claude/settings.local.json
-.claude/types/claude-code-mcp.d.ts
+.claude/types/
 .worktrees/

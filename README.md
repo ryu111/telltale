@@ -31,6 +31,14 @@ docs/                             spec (SDD), tickets, manual test results
 uv sync
 make check     # ruff, mypy, pytest, bun test, claude plugin validate --strict (plugin and marketplace)
 make mutate    # mutation tests: every entry in tests/突變/ must turn the suite red
+```
+
+Type declarations for the function-hooks API are not checked in: they are early-access and
+tied to the Claude Code build. Generate them once per version with `/plugin-types` inside a
+session (with `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`); `tsconfig.json` expects them under
+`.claude/types/`. Nothing in `make check` depends on them — they only feed editor IntelliSense.
+
+```bash
 CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude --plugin-dir "$PWD/plugins/telltale" --debug-file /tmp/tt.log
 ```
 
