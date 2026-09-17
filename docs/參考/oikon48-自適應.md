@@ -28,3 +28,4 @@
 - `de1lymoon-terminal-poster.png`：terminal-poster 風，方框 cell、連線上 ◆ 光點、鏡頭移動（風格 H）。
 - `hanako-loops-vs-graphs.png`：每個 job 自己一個 loop（點繞圈）、splitter→jobs→merge、進度條與 stat tile（H 的邊框繞點）。
 - `beamnxw-cards-pipeline.png`：三張大卡片（每張裡面有自己的清單／內容）、卡片間連線上的方點流動、底部四步 pipeline 目前步驟高亮、iteration 計數跳動、stat tile。＝ H 的 cell 放大版：Pane 高度夠時一個 agent 的 cell 可以列它最近的工具呼叫。
+- `dani_avila7-pacman-aboveprompt.png`：2.1.273 在 AbovePrompt 畫 Pac-Man（半格方塊字元、每幀重畫、方向鍵、`[ close ]` 按鈕、`/pacman stop`）。證明 Client 幀時鐘做即時動畫與鍵盤焦點在正式 build 上可行，v0.2 的 spinner／光點／鏡頭都在這個能力範圍內。
