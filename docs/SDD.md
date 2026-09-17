@@ -7,7 +7,7 @@
 
 | 題目說 | 型別檔／實測說 | 本檔的決定 |
 |---|---|---|
-| `claude plugin test <dir>` 全過 | 子指令不存在（帶旗標也沒有；npm latest 2.1.274 的 changelog 也沒提） | DoD #2 改成 `bun test plugins/telltale/hooks/` 連跑兩次 0 fail，harness 自建（§4） |
+| `claude plugin test <dir>` 全過 | 子指令不存在（帶旗標也沒有；npm latest 2.1.274 的 changelog 也沒提） | DoD #2 改成 `bun test tests/hooks/` 連跑兩次 0 fail，harness 自建（§4） |
 | 一律用 `e.props.bodyColumns` | `AbovePrompt` 的 props 只有 `hasSurvey`、`isWorking`、`maxRows`、`scroll`；`bodyColumns` 是 `Pane` 的 | 寬度由 `Client` 的 `surface.columns` 決定（region 實際排版後的欄數，resize 會再呼叫一次）；hooks module 只算高度、不算寬度（§1.5） |
 | `Client module="./chart.tsx"` 字面值路徑 | `hooks.json` 多一個 `"surface": "band.tsx"`（相對 hooks.json 的單一路徑），`Client` 的 `module` 是那個檔的**export 名** | `hooks.json = { modules: ["register.tsx"], surface: "band.tsx" }`，`<Client key="band" module="Band" props={…} />`（`key` 是樹上的位址、`module` 是 export 名，兩個字串刻意不同） |
 | `ClientElements` 少 `Raster` | `Omit<Elements['terminal'], 'Client'>`；整份型別檔沒有 `Raster` | 不提 Raster |
@@ -193,7 +193,7 @@ export function Band(props: BandProps, surface: ClientSurface<BandState>): Rende
 
 #### 2.5 安裝、開發、卸載（README 要寫的）
 
-- 目錄（2026-09-17 使用者裁定「專案結構跟 plugin 結構要拆開」）：repo 根是 marketplace（`.claude-plugin/marketplace.json`，`source: ./plugins/telltale`）＋開發工具；plugin 本體整個在 `plugins/telltale/`（`.claude-plugin/plugin.json`、`hooks/`、README、LICENSE）。本文件所有 `hooks/…` 路徑相對 `plugins/telltale/`；突變清單在 `tests/突變/`。
+- 目錄（2026-09-17 使用者裁定「專案結構跟 plugin 結構要拆開」）：repo 根是 marketplace（`.claude-plugin/marketplace.json`，`source: ./plugins/telltale`）＋開發工具；plugin 本體整個在 `plugins/telltale/`（`.claude-plugin/plugin.json`、`hooks/`、README、LICENSE）。本文件所有 `hooks/…` 路徑相對 `plugins/telltale/`；bun 測試與 `harness.ts` 在 `tests/hooks/`（plugin 目錄只放功能）；突變清單在 `tests/突變/`。
 - 開發：`--plugin-dir <repo>/plugins/telltale`；正式：`claude plugin marketplace add ryu111/telltale` → `claude plugin install telltale@telltale`；或放 `~/.claude/skills/telltale/`。同名時 `--plugin-dir` 優先。
 - 卸載：`claude plugin uninstall telltale` 刪 `${CLAUDE_PLUGIN_DATA}`，但 **`$.store` 的檔（`~/.claude/plugins/store/`）官方文件沒說會刪**——README 寫清楚檔案位置與一行清除指令。plugin 自己不做「卸載時清 store」（沒有這種事件）。
 
@@ -231,7 +231,7 @@ ui.message{ kind:"toggle" } / command.run{telltale}
 
 ### 4. 測試 harness（取代不存在的 `claude plugin test`）
 
-`hooks/harness.ts`：
+`tests/hooks/harness.ts`：
 
 ```ts
 export const fakeEngine = (opts?: { store?: Record<string, unknown>; now?: number; options?: PluginOptions }) => ({
@@ -242,7 +242,7 @@ export const fakeEngine = (opts?: { store?: Record<string, unknown>; now?: numbe
 });
 ```
 
-跑法：`bun test hooks/`（bun 讀 `.tsx`、`jsxFactory: h` 由 `tsconfig.json` 給）。`clientOf(tree)` 走樹找 `type === "Client"` 的節點，斷言它的 `props`。
+跑法：`bun test tests/hooks/`（bun 讀 `.tsx`、`jsxFactory: h` 由 `tsconfig.json` 給）。`clientOf(tree)` 走樹找 `type === "Client"` 的節點，斷言它的 `props`。
 
 **Client 內部畫的東西測不到**：`band.tsx` 只靠 `hit.ts`、`width.ts` 的純函式測試 + §5.3 tmux 實測。**I7（不重載）與 DoD #3 只有 tmux 實測算數**，fakeEngine 本來就不會重載，它的測試不能拿來當 DoD #3 的證據。
 
@@ -287,7 +287,7 @@ export const fakeEngine = (opts?: { store?: Record<string, unknown>; now?: numbe
 - `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude --plugin-dir "$PWD" --debug-file <f>` 開發；存檔熱重載。
 - 型別來源：`.claude/types/claude-code.d.ts`（`/plugin-types` 產，不手改；進版控方便 CI 型別檢查）。
 - `tsconfig.json` 照型別檔檔頭；含 JSX 的檔一律 `.tsx`。
-- 測試：`bun test hooks/`；閘：`make check`（Python 的 scripts 層 + validate + bun test）；突變：`make mutate`（`scripts/突變.py` 對 §5 表的每一條改壞一行跑 `bun test`，全綠即失敗）。
+- 測試：`bun test tests/hooks/`；閘：`make check`（Python 的 scripts 層 + validate + bun test）；突變：`make mutate`（`scripts/突變.py` 對 §5 表的每一條改壞一行跑 `bun test`，全綠即失敗）。
 - 不准：`$.process.*`、`$.fs.*`、`$.http.*`、hook `tool.call`／`classic.*`（I9）。
 - 手動實測用 tmux（題目 §5.3），每次都 grep debug log。
 

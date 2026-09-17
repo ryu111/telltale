@@ -1,6 +1,6 @@
 // Ticket 03: layout(). SDD §1.2 rules 1–7, invariants I2/I3. Evaluation: exact match.
 import { expect, test } from "bun:test";
-import { BAND_ROWS_MAX, CONTENT_ROWS_MAX, FIXED_ROWS, MIN_COLUMNS, PANEL_TITLE_ROWS, layout } from "./layout";
+import { BAND_ROWS_MAX, CONTENT_ROWS_MAX, FIXED_ROWS, MIN_COLUMNS, PANEL_TITLE_ROWS, layout } from "../../plugins/telltale/hooks/layout";
 
 const P = (id: string, minRows: number, wantRows: number) => ({ id, minRows, wantRows });
 
@@ -101,7 +101,7 @@ test("rule 2/5: every slot gets at least its minRows", () => {
 });
 
 test("layout.ts is pure: no imports at all (never claude-code, never $)", async () => {
-  const src = await Bun.file(new URL("./layout.ts", import.meta.url)).text();
+  const src = await Bun.file(new URL("../../plugins/telltale/hooks/layout.ts", import.meta.url)).text();
   expect(src).not.toMatch(/^\s*import\b/m);
   expect(src).not.toContain("claude-code");
 });

@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 執行器型 = Callable[[Sequence[str], Path], int]
-測試目錄 = "plugins/telltale/hooks/"  # bun test 的目標；plugin 本體住 plugins/telltale/
+測試目錄 = "tests/hooks/"  # bun test 的目標；plugin 本體住 plugins/telltale/，只放功能
 _清單壞 = 2
 _有人沒守 = 1
 

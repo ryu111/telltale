@@ -3,9 +3,9 @@
 // Evaluation: exact match. I7 / DoD #3 in the real engine are verified by tmux (ticket 06).
 import { expect, test } from "bun:test";
 import { clientOf, fakeEngine } from "./harness";
-import type { Panel } from "./panel";
-import { makeRegister, register } from "./register";
-import { displayWidth } from "./width";
+import type { Panel } from "../../plugins/telltale/hooks/panel";
+import { makeRegister, register } from "../../plugins/telltale/hooks/register";
+import { displayWidth } from "../../plugins/telltale/hooks/width";
 
 const ALLOWED = [
   "$.ui.resolve",
@@ -211,8 +211,8 @@ test("I1: every allowed op is exercised at least once across start + tick + rend
 });
 
 test("I1: claude plugin validate --strict reports exactly the seven allowed calls", () => {
-  // The plugin root is this file's parent directory, wherever the repo is checked out.
-  const pluginDir = new URL("..", import.meta.url).pathname;
+  // Resolve the plugin root from this file, wherever the repo is checked out.
+  const pluginDir = new URL("../../plugins/telltale/", import.meta.url).pathname;
   const r = Bun.spawnSync(["claude", "plugin", "validate", "--strict", "--json", pluginDir], {
     env: { ...process.env, CLAUDE_CODE_ENABLE_FUNCTION_HOOKS: "1" },
   });

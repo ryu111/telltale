@@ -4,7 +4,7 @@
 - 專案名：telltale（GitHub public：ryu111/telltale）
 - 一句話目標：Claude Code 的常駐狀態帶 plugin，多個獨立面板由一個框架統一調度，只用 function hooks 的 `ui.render{AbovePrompt}`。
 - Pipeline（產品的執行流程，不是開發流程）：面板 `poll` → `$.store` 快取 → `layout()` 分配列數 → 面板 `view()` 產生列 → `Client`（band.tsx）畫出來並收滑鼠
-- 目錄分兩層（2026-09-17 使用者裁定）：根是 marketplace＋開發工具，plugin 本體整個在 `plugins/telltale/`；SDD 與票裡寫的 `hooks/…` 都相對那裡。突變清單在 `tests/突變/`。
+- 目錄分兩層（2026-09-17 使用者裁定）：根是 marketplace＋開發工具，plugin 本體整個在 `plugins/telltale/`；SDD 與票裡寫的 `hooks/…` 都相對那裡。bun 測試與 harness 在 `tests/hooks/`（plugin 目錄只放功能），突變清單在 `tests/突變/`。
 - 定義本體：`docs/SDD.md`；任務：`docs/tasks/<feature>/NN-<slug>.md`；tracker 設定：`docs/agents/issue-tracker.md`（mattpocock 的 skill 讀這份）
 - 受眾是全世界：程式碼註解、README 用英文；docs/ 與票用中文。
 
@@ -12,7 +12,9 @@
 ```bash
 uv sync            # 第一次，或改了相依之後（只裝跑票工具，plugin 本體不用 Python）
 make check         # commit 前的閘：ruff + mypy + scripts/ 的單元測試（plugin 的閘見下）
-CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude --plugin-dir "$PWD/plugins/telltale" --debug-file /tmp/tt.log   # 開發模式，存檔熱重載
+# 平常：~/.claude/skills/telltale → plugins/telltale 的 symlink，settings.json env 已開 CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1，
+# 直接 `claude` 就載入（telltale@skills-dir，跟 checkout 同一份，不用 install、不會被版本綁住；改檔重開 session）。
+claude --plugin-dir "$PWD/plugins/telltale" --debug-file /tmp/tt.log   # 要熱重載或看 debug log 時；同名時它優先於 skills-dir
 claude plugin validate --strict plugins/telltale    # calls: 那行只准 $.ui.* $.clock.* $.store.* $.command.register $.env.get
 claude plugin validate --strict .      # 根目錄是 marketplace（.claude-plugin/marketplace.json），plugin 住 plugins/telltale/
 ```

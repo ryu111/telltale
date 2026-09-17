@@ -13,7 +13,7 @@ check:
 	$(PY) mypy --no-incremental
 	$(PY) pytest -n $(WORKERS) --dist load tests/單元
 	@# plugin 本體：bun 對「沒有任何 *.test.ts」回 1，所以先 find 再跑，零測試檔不算紅
-	@if find plugins/telltale/hooks -name '*.test.ts*' 2>/dev/null | grep -q .; then bun test plugins/telltale/hooks/; else echo "bun test: no test files under plugins/telltale/hooks/ yet"; fi
+	@if find tests/hooks -name '*.test.ts*' 2>/dev/null | grep -q .; then bun test tests/hooks/; else echo "bun test: no test files under tests/hooks/ yet"; fi
 	CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin validate --strict plugins/telltale
 	claude plugin validate --strict .   # the marketplace manifest at the repo root
 

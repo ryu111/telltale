@@ -358,7 +358,7 @@ def test_ts驗收走bun_test_不走pytest(tmp_path: Path) -> None:
     票檔 = tmp_path / "docs/tasks/x/02-layout.md"
     票檔.write_text(
         "# 02\n- 可碰檔案：`plugins/telltale/hooks/layout.ts`\n"
-        "- 驗收測試：`plugins/telltale/hooks/layout.test.ts`\n",
+        "- 驗收測試：`tests/hooks/layout.test.ts`\n",
         encoding="utf-8",
     )
     骨架目錄 = tmp_path / "docs/tasks/x/測試骨架"
@@ -366,7 +366,7 @@ def test_ts驗收走bun_test_不走pytest(tmp_path: Path) -> None:
     (骨架目錄 / "02-hooks_layout.test.ts.txt").write_text(
         "test('a', () => {});\n", encoding="utf-8"
     )
-    對 = [{"test": "plugins/telltale/hooks/layout.test.ts", "definition": "§1.2"}]
+    對 = [{"test": "tests/hooks/layout.test.ts", "definition": "§1.2"}]
     執 = 假執行(
         {
             "files": " M plugins/telltale/hooks/layout.ts\n",
@@ -379,7 +379,7 @@ def test_ts驗收走bun_test_不走pytest(tmp_path: Path) -> None:
     跑票.跑票(票檔, tmp_path, 執, ["委派"], 輪數=2).全部()
     bun們 = [a for a in 執.紀錄 if a[:2] == ["bun", "test"]]
     assert bun們 == [
-        ["bun", "test", "plugins/telltale/hooks/layout.test.ts"]
+        ["bun", "test", "tests/hooks/layout.test.ts"]
     ]  # 出題站紅檢查；驗收站由 make check 涵蓋
     assert not [a for a in 執.紀錄 if a[:3] == ["uv", "run", "pytest"]]
 

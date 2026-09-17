@@ -1,8 +1,8 @@
 // Ticket 07: /telltale. SDD §1.6 table + the command.run hook. Exact match.
 import { expect, test } from "bun:test";
-import { runTelltale, type TelltaleState } from "./command";
+import { runTelltale, type TelltaleState } from "../../plugins/telltale/hooks/command";
 import { fakeEngine } from "./harness";
-import { register } from "./register";
+import { register } from "../../plugins/telltale/hooks/register";
 
 const state = (panels: Record<string, boolean> = { hello: true, clock: true }): TelltaleState => ({
   order: [

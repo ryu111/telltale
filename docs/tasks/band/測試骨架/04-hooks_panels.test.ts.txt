@@ -1,10 +1,10 @@
 // Ticket 04: panel types, hello, clock, registry. SDD §1.1, §2.2, §2.2a, §2.3; I6, I10. Exact match.
 import { expect, test } from "bun:test";
-import type { Panel } from "./panel";
-import { clock } from "./panels/clock";
-import { hello } from "./panels/hello";
-import { PANELS } from "./panels/index";
-import { displayWidth } from "./width";
+import type { Panel } from "../../plugins/telltale/hooks/panel";
+import { clock } from "../../plugins/telltale/hooks/panels/clock";
+import { hello } from "../../plugins/telltale/hooks/panels/hello";
+import { PANELS } from "../../plugins/telltale/hooks/panels/index";
+import { displayWidth } from "../../plugins/telltale/hooks/width";
 
 const ID = /^[a-z][a-z0-9-]{0,15}$/;
 

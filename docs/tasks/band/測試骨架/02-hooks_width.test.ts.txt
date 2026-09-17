@@ -1,6 +1,6 @@
 // Ticket 02: displayWidth / fit. SDD §1.3, invariant I4. Evaluation: exact match.
 import { expect, test } from "bun:test";
-import { displayWidth, fit } from "./width";
+import { displayWidth, fit } from "../../plugins/telltale/hooks/width";
 
 test("ascii counts 1 per char", () => {
   expect(displayWidth("hello")).toBe(5);

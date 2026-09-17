@@ -1,9 +1,9 @@
 // Ticket 06: hit testing for the band (pure). SDD §1.5. Exact match.
 // Band() itself runs on the drawing thread and has no automated test; tmux covers it (ticket text).
 import { expect, test } from "bun:test";
-import { TITLE_RESERVE, hitPanel, isClick, rowsOf } from "./hit";
-import { MIN_COLUMNS } from "./layout";
-import type { BandProps } from "./register";
+import { TITLE_RESERVE, hitPanel, isClick, rowsOf } from "../../plugins/telltale/hooks/hit";
+import { MIN_COLUMNS } from "../../plugins/telltale/hooks/layout";
+import type { BandProps } from "../../plugins/telltale/hooks/register";
 
 const P = (id: string, rows: number) => ({
   id,
