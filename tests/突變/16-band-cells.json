@@ -1,0 +1,8 @@
+[
+  {
+    "label": "pane: session.start never opens it",
+    "file": "plugins/telltale/hooks/register.tsx",
+    "old": "await $.ui.open({ id: \"telltale\", title: \"telltale\" });",
+    "new": "void 0;"
+  }
+]
