@@ -3,6 +3,11 @@
 
 import type { Stages } from "./layout";
 import type { PendingSpawn } from "./observe";
+import type { Cell } from "./cells";
+
+// Re-exported so callers don't need a second import line for a type this
+// module's own `Panel`/`PanelIo` already reference structurally.
+export type { Cell };
 
 export type Tone = "up" | "down" | "flat" | "dim";
 
@@ -24,10 +29,19 @@ export type PanelLine = {
   tone?: Tone;
 };
 
-export type PanelView = {
+// v0.2, SDD §1.1a: a panel that draws animated cells (the `agents` panel)
+// returns this shape instead of `lines` — `hooks/band.tsx`'s pure `renderCell`
+// turns each `Cell` into display columns on the drawing thread.
+export type CellsView = {
   id: string;
-  lines: PanelLine[]; // length <= given rows
+  kind: "cells";
+  cells: Cell[];
+  style?: "v1" | "v2" | "v4";
 };
+
+export type PanelView =
+  | { id: string; lines: PanelLine[] } // length <= given rows
+  | CellsView;
 
 export type PanelIo = {
   now: () => Promise<number>; // framework passes `() => $.clock.now()` (async since 2.1.274; wrapped, never the bare $.clock.now)

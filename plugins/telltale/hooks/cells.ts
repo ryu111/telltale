@@ -16,6 +16,7 @@ export type Cell = {
   updatedAt: number;
   steps: Step[];
   dismissed?: true;
+  collapsed?: true; // ticket 17: onRow toggles this for a running cell
 };
 
 // Time and layout constants — sole source of truth (DESIGN §5).

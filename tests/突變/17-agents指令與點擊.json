@@ -1,0 +1,20 @@
+[
+  {
+    "label": "agents size: writes wrong key",
+    "file": "plugins/telltale/hooks/command.ts",
+    "old": "      return agentsSet(\"size.agents\", \"size\", view.size, value, state);",
+    "new": "      return agentsSet(\"size_agents\", \"size\", view.size, value, state);"
+  },
+  {
+    "label": "agents edge: unsupported value silently accepted",
+    "file": "plugins/telltale/hooks/command.ts",
+    "old": "    if (tokens.length === 3 && (value === \"right\" || value === \"bottom\")) {",
+    "new": "    if (tokens.length === 3 && value !== undefined) {"
+  },
+  {
+    "label": "onRow: failed cell not dismissible",
+    "file": "plugins/telltale/hooks/panels/agents.ts",
+    "old": "  if (cell.status === \"failed\" || cell.status === \"killed\" || cell.status === \"orphan\") {",
+    "new": "  if (cell.status === \"failed\") {"
+  }
+]
