@@ -1,0 +1,8 @@
+[
+  {
+    "label": "empty stub is closed instead of dropped",
+    "file": "plugins/telltale/hooks/panels/agents.ts",
+    "old": "    if (existing.status === \"running\" && existing.desc === \"\" && info.description === \"\" && info.status !== \"running\") {\n      const { [info.id]: _dropped, ...rest } = working;\n      working = rest;\n      continue;\n    }\n\n    // Fill in a turn.step-created stub's desc (never rebuilds an existing cell).\n    const withDesc = existing.desc === \"\" && existing.status === \"running\" ? { ...existing, desc: info.description } : existing;",
+    "new": "    // Fill in a turn.step-created stub's desc (never rebuilds an existing cell).\n    const withDesc = existing.desc === \"\" && existing.status === \"running\" ? { ...existing, desc: info.description } : existing;"
+  }
+]
