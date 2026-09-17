@@ -65,7 +65,10 @@ export const formatElapsed = (ms: number): string => {
   const totalMinutes = Math.floor(totalSeconds / 60);
   const remSeconds = totalSeconds % 60;
   if (totalMinutes < 60) {
-    return remSeconds > 0 ? `${totalMinutes}m${String(remSeconds).padStart(2, "0")}` : `${totalMinutes}m`;
+    // Compute the padded remainder unconditionally so a tampered pad
+    // (e.g. treating 0 as truthy) is observable even on an exact minute.
+    const ss = String(remSeconds).padStart(2, "0");
+    return ss === "00" ? `${totalMinutes}m` : `${totalMinutes}m${ss}`;
   }
 
   const totalHours = Math.floor(totalMinutes / 60);
