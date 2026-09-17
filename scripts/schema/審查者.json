@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "properties": {
+    "missing": {"type": "array", "items": {"type": "string"}},
+    "out_of_scope": {"type": "array", "items": {"type": "string"}},
+    "test_to_definition": {
+      "type": "array",
+      "items": {"type": "object", "properties": {"test": {"type": "string"}, "definition": {"type": "string"}}, "required": ["test", "definition"], "additionalProperties": false}
+    }
+  },
+  "required": ["missing", "out_of_scope", "test_to_definition"],
+  "additionalProperties": false
+}

@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "properties": {
+    "check_exit": {"type": ["integer", "null"]},
+    "check_last_line": {"type": ["string", "null"]},
+    "tests_red_to_green": {"type": "array", "items": {"type": "string"}},
+    "files_changed": {"type": "array", "items": {"type": "string"}},
+    "stuck": {"type": ["string", "null"]}
+  },
+  "required": ["check_exit", "check_last_line", "tests_red_to_green", "files_changed", "stuck"],
+  "additionalProperties": false
+}
