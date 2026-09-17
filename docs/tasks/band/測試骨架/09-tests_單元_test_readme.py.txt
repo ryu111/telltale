@@ -26,7 +26,7 @@ def _validate_notes() -> list[str]:
 
 def test_readme_的validate區塊與當前輸出一致() -> None:
     readme = (根 / "README.md").read_text(encoding="utf-8")
-    m = re.search(r"## What this plugin can touch.*?```text\n(.*?)```", readme, re.S)
+    m = re.search(r"## What this plugin can touch.*?```text\n(.*?)```", readme, re.DOTALL)
     assert m, "README 缺 `## What this plugin can touch` 底下的 ```text 區塊"
     貼的 = [行.strip() for 行 in m.group(1).strip().splitlines()]
     真的 = [n.strip() for n in _validate_notes() if " hooks: " in n or " calls: " in n]
@@ -35,7 +35,12 @@ def test_readme_的validate區塊與當前輸出一致() -> None:
 
 def test_readme_提到的已知限制() -> None:
     readme = (根 / "README.md").read_text(encoding="utf-8")
-    for 關鍵 in ("CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1", "/telltale", "~/.claude/plugins/store", "emoji"):
+    for 關鍵 in (
+        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1",
+        "/telltale",
+        "~/.claude/plugins/store",
+        "emoji",
+    ):
         assert 關鍵 in readme, 關鍵
 
 
