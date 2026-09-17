@@ -2,6 +2,7 @@
 // SDD §1.4, §1.5, §2.1, §3, §4; invariants I1, I4, I5, I7 (fake level only), I8, I10, I11.
 // Evaluation: exact match. I7 / DoD #3 in the real engine are verified by tmux (ticket 06).
 import { expect, test } from "bun:test";
+import { fileURLToPath } from "node:url";
 import { clientOf, fakeEngine } from "./harness";
 import type { Panel } from "../../plugins/telltale/hooks/panel";
 import { makeRegister, register } from "../../plugins/telltale/hooks/register";
@@ -212,7 +213,7 @@ test("I1: every allowed op is exercised at least once across start + tick + rend
 
 test("I1: claude plugin validate --strict reports exactly the seven allowed calls", () => {
   // Resolve the plugin root from this file, wherever the repo is checked out.
-  const pluginDir = new URL("../../plugins/telltale/", import.meta.url).pathname;
+  const pluginDir = fileURLToPath(new URL("../../plugins/telltale/", import.meta.url)); // not .pathname: it percent-encodes non-ASCII worktree names
   const r = Bun.spawnSync(["claude", "plugin", "validate", "--strict", "--json", pluginDir], {
     env: { ...process.env, CLAUDE_CODE_ENABLE_FUNCTION_HOOKS: "1" },
   });
