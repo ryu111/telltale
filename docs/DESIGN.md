@@ -1,114 +1,73 @@
-# DESIGN：agents 面板（telltale v0.2）
+# DESIGN：agents 面板（telltale v0.2）— 2026-09-17 定案
 
-> 終端沒有字級、陰影、圓角、補間。能用的只有六種手段：粗體、色彩明度階、邊框樣式、字元密度、留白、位置（題目 §7.4）。
-> 這份定「長什麼樣」；「怎麼算」在 `docs/SDD.md` §2.6／§1.5。挑毛病與實作都以本檔的表為準。
+> 終端沒有字級、陰影、圓角、補間；能用的只有粗體、明度階、邊框、字元密度、留白、位置（題目 §7.4）。
+> 本檔定「長什麼樣、怎麼動」；「怎麼算」在 `docs/SDD.md` §2.6／§1.5。可互動的樣本：`docs/設計/試衣間.html`（同 artifact https://claude.ai/artifact/JGji4nDpf2gKLKv2b8q86G，Version 10）；挑毛病與實作以本檔＋樣本為準。
+> 訪談過程中被淘汰的方向（lanes 時序泳道、tree、trace 瀑布、k9s 表格、狀態流看板、軌道）留在 `docs/設計/試衣間-第一輪.html`，只當紀錄。
 
-## 0. 三條硬規則（btop／htop／k9s 查到的，題目 §7.4）
+## 0. 一句話
 
-1. **顏色只表達嚴重度**：綠＝正常進行、黃＝要注意（孤兒 lane、超時）、紅＝失敗／被殺、暗＝已結束或次要。同一顏色不承載第二種語義（type、model 不用顏色分）。
-2. **留白的成本是整行**：不用空白列分組，用 `─ agents ───` 標題列與 `├─`／`└─` 連接線。
-3. **沒有補間、不閃爍**：狀態切換＝瞬時換符號／換色＋**短暫加粗 1 秒**；spinner 是唯一持續動的東西；經過時間每秒跳。
+**一個 cell 一個任務；cell 裡的流程圖隨事件動態長出來；鏡頭跟著最新節點；多個任務就是多個一模一樣的 cell。**
 
-## 1. 符號表（固定，不隨風格變）
+任務＝主迴圈的一輪（main）、一個 subagent、或一個背景任務（shell／Monitor／Workflow）。三種用同一個表示，只有名字與來源不同。
 
-| 狀態 | 符號 | 色 | 說明 |
+## 1. 三種 cell 樣式（`/telltale agents style v1|v2|v4`）
+
+| 樣式 | 形狀 | 預設用在 | 完成後 |
 |---|---|---|---|
-| running | `⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏` 輪播 | 綠 | 80 ms 一幀，Client 的 frame clock 跑，hooks module 不參與 |
-| completed | `✓` | 暗 | 60 s 後消失 |
-| failed | `✗` | 紅 | 留到點掉 |
-| killed | `⊘` | 紅 | 留到點掉 |
-| pending／queued | `○` | 暗 | 引擎給的其他 status 一律歸這格 |
-| 孤兒 lane（背景任務 30 min 沒通知） | `?` | 黃 | 點掉可收 |
-| 主迴圈 idle | `·` | 暗 | 上一輪結束後 60 s 內顯示 `idle · last 1m04` |
-| 主迴圈階段 | `responding`／`thinking`／`tool-input`／`tool-use` 原字 | 綠 | 來自 `ui.render{Spinner}` 的 `mode` |
+| **v1** | 第 1 列＝分隔線＋標題＋任務名稱；第 2–4 列＝橫向方框鏈（每個節點 12 欄寬的 `┌┐│└┘` 方框，節點間 4 欄連線） | 面板貼在 **bottom／top**（寬而矮） | 只剩第 1 列 |
+| **v2** | `┌ 標題 ┐` 框；框內第 1 行＝任務名稱；底下直向節點列表（`◉ Bash  make check  4s`），節點間 1 列 `│` | 面板貼在 **left／right**（窄而高） | 縮成 8 欄寬的直欄：`✓ main` 底下每個步驟一行 |
+| **v4** | 第 1 列同 v1；第 2 列＝壓成一條鏈的流程 `● prompt ─▸ ● think ─▸ ◉ Bash` | 高度只剩 2–3 列時 | 只剩第 1 列 |
 
-時間格式：`12s`、`1m04`、`12m`、`1h02`（4–5 字元，右對齊）。
+- 標題：`<狀態符號> <名字> <模型> <經過時間>`；名字 main 琥珀、subagent 紫；模型灰；時間藍。
+- 任務名稱：main＝這輪 prompt 的前 60 字（`turn.start.text`）；subagent＝`AgentInfo.description`；背景任務＝Bash 的 `description`（缺就 command 前 40 字）。放不下就**跑馬燈**（每 0.3 s 左移一格，循環中間隔 `   ·   `）。
+- **鏡頭**（v1／v4 橫向）：目標＝最新節點右緣離區域右邊 28 欄（兩個節點寬＋一段連線）；每幀往目標移 25%，差 <1 格貼齊；最新節點永遠完整在畫面內。**v2 縱向**：硬鎖，最新節點永遠在 cell 最底一列，舊的往上推。
+- 節點寬度固定 12 欄（名字最多 8 字，超長 `…`）；名字＝工具名或 `think`／`prompt`／`reply`／`Agent`。
 
-## 2. 三段高度（點標題列循環：summary → compact → full → summary）
+## 2. 節點種類與顏色
 
-帶子固定 2 列（標題、狀態）＋每個面板 1 列標題；agents 內容列數：
-
-| 段 | 內容列 | 長相 |
+| 種類 | 來源 | 顏色 |
 |---|---|---|
-| summary | 0 | 只有面板標題列，摘要寫在標題裡：`─ agents · ⠼ 3 running · 1 done · 1 ✗ ─────────────── lanes ─` |
-| compact | 3 | 主迴圈 1 列 ＋ 2 列 agent（running 優先；多的折成 `… +N`） |
-| full | 吃滿 `maxRows` 剩下的 | 全部列出；不夠時照 SDD §2.6 的聚合／收合規則 |
+| `prompt` | `turn.start` | 灰 |
+| `think` | Spinner `mode` ∈ {responding, thinking, requesting} 且沒有工具在跑 | 紫 |
+| 工具（`Bash`、`Read`、`Edit`…） | `turn.step.toolUses[].name`（`Bash(make check)` 的括號內容放細節） | 藍 |
+| `Agent` | toolUses 裡的 `Agent`（同時開一個新 cell） | 琥珀 |
+| `reply` | `turn.complete` | 綠 |
+| 目前節點 | — | 白粗體＋淡綠底 `backgroundColor`（型別檔有此 prop；票 16 實測拿不到就退成只粗體） |
+| 已走過的節點 | — | 名字灰（`m`），符號 `●` 保留種類色 |
+| 失敗 | status failed／killed | 符號 `✗` 紅粗體、cell 邊框紅、淡紅底 |
 
-`full` 在 34 列終端＝6 列內容（9 − 2 − 1）；終端越高越多，上限跟著 `maxRows`。
+調色（Client 用 truecolor，不支援時退 16 色）：底 `#0b0e14`、字 `#c9d1d9`、框 `#232a36`、綠 `#5be49b`、暗綠 `#2f6a4c`、藍 `#79c0ff`、紫 `#c792ea`、琥珀 `#f2c14e`、紅 `#ff6b6b`、灰三階 `#8b949e`／`#4b5563`／`#2f3743`。
 
-## 3. 兩種主視圖（`/telltale agents view lanes|tree`，標題列最右的 `lanes`／`tree` 字樣點了也切）
+## 3. 動態（全部樣式共用；時間常數是定義的一部分）
 
-### 3.1 lanes（時序泳道）：橫軸是最近 60 秒，「現在」固定在右緣，每秒整張左移一格
+| 事件 | 畫面 |
+|---|---|
+| 新節點 B 到（事件） | B 先以 `·` 佔位；**只有 A → B 那條線**跑 `◆` 光點（帶兩格 `·` 尾巴），歷時 `TRANSIT = 600 ms`；其他連線全部靜止 |
+| 光點抵達 | 光點停；B 亮起成目前節點（白粗體、淡綠底、框呼吸）；名字 400 ms 內逐字打出、方框從 3 欄展開到 12 欄；**A 與 A 的框壓灰** |
+| 目前節點 | 框每 `600 ms` 粗／細交替（呼吸）；經過時間每秒跳 |
+| cell running | 邊框暗綠；剛有事件的 1 s 內亮綠粗體 |
+| 新 cell | 從右緣滑入 `500 ms`（v2 從下緣） |
+| cell 完成 | 標題 `✓`、整個 cell 降到極暗灰；`3 s` 後收合（v1／v4 剩第 1 列；v2 縮成直欄）；`60 s` 後消失 |
+| cell 失敗 | 節點 `✗`、邊框紅、淡紅底；**留到點掉**或 `/telltale agents clear` |
+| 背景任務孤兒（30 min 沒通知） | 符號 `?` 黃，留到點掉 |
 
-```
-telltale · 1 panel                                                                                                 [-]
-─ agents · ⠼ 3 running · 1 done ────────────────────────────────────────────────────────────────────────── lanes ─
- main        tool-use   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━▶  1m04
- ⠼ review    sonnet     ·················━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━▶   32s
- ✓ explore   haiku      ··········━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━■······················   18s
- ⠼ impl ×2   sonnet     ····································━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━▶   14s
- ⠼ bg: make check       ···························································━━━━━━━━━━━━━━━━━━━━━━━━━▶    5s
-                        └── -60s ───────────────────────── -30s ───────────────────────────────────── now ┘
-```
+不做：閃爍、hover、滑出動畫以外的位移動畫。
 
-- 欄位：`[符號] [label 10] [model／phase 10] [bar 依 columns 補滿] [elapsed 5]`。label 超長裁 `…`。
-- bar：`━` 進行中、`■` 結束點、`·` 視窗內但不在生命期。結束的 lane 在右緣 `■` 之後繼續 `·` 直到 60 s 滑出視窗。
-- **bar 長度是真的時間**（視窗固定、現在固定在右緣），所以新 lane 出現不會讓舊 lane 位移——這是題目 §7.1 反對時間軸的理由被解掉的地方：反對的是「軸隨資料伸縮」，這裡軸不伸縮。
-- 最後一列刻度只在 `full` 段畫；`compact` 不畫。
+## 4. 面板貼哪一邊、開合
 
-### 3.2 tree（流程圖＋樹）
+- 設計上四邊（top／bottom／left／right）都要能貼，各自收合；**2.1.274 引擎只給兩個位置**：`Pane`（寬時右側 dock）與窄時自動落到輸入框上方。v0.2 實作這兩個，`/telltale agents edge` 只接受引擎有的值，其他回 `not available in this build`。
+- 開合大小由引擎管（Pane 的寬／高、AbovePrompt 的 `maxRows`）；面板內用三段 `size`（summary＝只有標題列、compact＝每 cell 收合、full＝全展）在引擎給的範圍內切。
+- 樣式預設：貼側邊→v2，貼上下→v1，可用 `/telltale agents style` 覆蓋，存 `$.store`。
 
-```
-telltale · 1 panel                                                                                                 [-]
-─ agents · ⠼ 3 running · 1 done ─────────────────────────────────────────────────────────────────────────── tree ─
- main   ● prompt ─▸ ● thinking ─▸ ◉ Bash(make check) ─▸ ○ reply                                                 1m04
- ├─ ⠼ review      sonnet   "spec review of 05"                                                                   32s
- ├─ ✓ explore     haiku    done                                                                                  18s
- ├─ ⠼ impl ×2     sonnet   "implement 06", "implement 07"                                                        14s
- └─ ⠼ bg: shell            make check                                                                             5s
-```
+## 5. 點擊
 
-- 主迴圈那列是這一輪的流程：固定四個節點 `prompt ▸ thinking ▸ <目前工具> ▸ reply`，目前所在節點 `◉`＋粗體，走過的 `●`，還沒到的 `○`。工具節點顯示 `turn.step` 最後一批 toolUses 的第一個（多個時 `Bash +2`）。
-- 子節點縮排一層（`parentId` 有值就再縮一層）。同父、葉節點、type 與 status 都相同的合併成 `type ×N`（題目 §7.1 聚合規則 1）。
-- 背景任務（shell／monitor／workflow）標 `bg:` 前綴，掛在 main 底下。
+- 點 cell 標題：展開／收合這個 cell（完成的 cell 點了重新展開 10 s）。
+- 點失敗或孤兒的 cell：點掉。
+- 點面板標題列：循環段位（第一輪的規則）。
 
-### 3.3 點一列 agent：展開詳情（再點收回）
+## 6. 真機要驗（票 16）
 
-```
- ├─ ⠼ review      sonnet   "spec review of 05"                                                                   32s
- │     id a1b2c3 · parent main · started 14:02:11 · name reviewer
-```
-
-詳情固定 1 列（欄位不夠寬就裁）。同時最多展開 1 列：點另一列時前一列自動收。失敗列點了＝收掉（不展開）。
-
-## 4. 風格三選一（挑毛病前請選；影響 band.tsx 的顏色表與標題列，不影響任何純函式）
-
-### A. 極簡單色（推薦）
-只有「綠／紅／暗／一般」四階＋粗體。標題列不加色。上面 §3 的圖就是 A。
-
-### B. btop 式三色明度
-running 綠、warning 黃、failed 紅之外，**label 依 type 明度分階**（Explore 淡、general-purpose 一般、自訂 agent 亮），bar 用 `▁▃▅▇` 密度表示每 6 秒的工具呼叫數（活動量），不是單一 `━`。
-代價：多一條資料（每 lane 的呼叫數時間序列），bar 的語義從「活著」變「多忙」。
-
-```
- ⠼ review    sonnet     ·················▁▁▃▅▇▇▅▃▁▁▃▃▅▇▇▇▅▃▁▁▁▃▅▅▃▁▁▃▅▇▇▅▃▁▁▃▃▁▁▃▅▇▇▅▃▁▶   32s
-```
-
-### C. k9s 式高密度表格
-不畫 bar，每列是固定欄位表：`ST  TYPE        MODEL   AGE   TOOLS  DESCRIPTION`，標題列有欄名，running 列整列淡綠底色。
-代價：沒有時間感（那是 lanes 存在的理由），但一列塞最多資訊。
-
-```
-─ agents · ⠼ 3 running · 1 done ───────────────────────────────────────────────────────────────────────────────────
- ST  TYPE             MODEL   AGE    TOOLS  DESCRIPTION
- ⠼   general-purpose  sonnet  32s    14     spec review of 05
- ✓   Explore          haiku   18s    3      count files
- ⠼   general-purpose  sonnet  14s    9      implement 06  (+1 same)
-```
-
-## 5. 這一版明確不做
-
-- hover（click 是唯一互動）。
-- 橫向狀態歷史鏈（`● Plan ── ● Code ── ○ Review`）：衍生狀態，第三輪。
-- 跨 session 匯總、function hooks 關掉時的降級版（題目 §7.1 第二句），第三輪。
-- 顏色自訂／主題。
+1. subagent 內部的工具事件是否由 `turn.step` 帶 `agentId` 送到；拿不到 → subagent cell 只有 `spawned → running → done` 三個節點，main cell 才有完整流程。
+2. `Text` 的 `backgroundColor` 在 AbovePrompt／Pane 是否生效。
+3. 每幀（80 ms）重畫全滿 cell 的成本 < 5 ms（ClientModule 超時會被卸載）。
+4. Pane 在 150→100 欄換位置時 Client 的 `surface.columns` 是否跟著變（已知 `bodyColumns` 66→96）。

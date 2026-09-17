@@ -1,0 +1,292 @@
+<title>telltale cell 流程圖試衣間</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+  :root{ --ground:#f3f1ec; --ink:#1f2126; --ink-2:#5b5f68; --line:#d9d5cc; --panel:#fff; --accent:#b8791c; --accent-ink:#fff;
+    --term-bg:#0b0e14; --term-fg:#c9d1d9; --term-dim:#4b5563; --term-green:#5be49b; --term-red:#ff6b6b; --term-yellow:#f2c14e; --term-cyan:#79c0ff; --term-violet:#c792ea; --term-frame:#232a36; --term-hl:rgba(91,228,155,.16); --term-hlr:rgba(255,107,107,.16); }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --ground:#14161a; --ink:#e6e2d8; --ink-2:#9aa0aa; --line:#2a2e35; --panel:#1b1e24; --accent:#e0a23a; --accent-ink:#1a1408; } }
+  :root[data-theme="dark"]{ --ground:#14161a; --ink:#e6e2d8; --ink-2:#9aa0aa; --line:#2a2e35; --panel:#1b1e24; --accent:#e0a23a; --accent-ink:#1a1408; }
+  body{ background:var(--ground); color:var(--ink); font:15px/1.55 "IBM Plex Sans",system-ui,sans-serif; padding:0 20px; padding-block:28px 60px; }
+  main{ max-width:1180px; margin:0 auto; display:grid; gap:22px; }
+  h1{ font:600 30px/1.1 "IBM Plex Sans Condensed",sans-serif; margin:0; text-wrap:balance; }
+  h2{ font:600 17px/1.2 "IBM Plex Sans Condensed",sans-serif; margin:0; }
+  p{ margin:0; max-width:70ch; color:var(--ink-2); }
+  .eyebrow{ font:500 12px/1 "IBM Plex Sans",sans-serif; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); }
+  header{ display:grid; gap:10px; }
+  .bar{ position:sticky; top:0; z-index:2; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px 14px; display:flex; flex-wrap:wrap; gap:12px 20px; align-items:center; }
+  .bar label{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-2); }
+  .act{ background:transparent; color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:5px 11px; font:500 13px "IBM Plex Sans",sans-serif; cursor:pointer; }
+  .act:hover{ border-color:var(--accent); } .act:focus-visible,input:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  input[type=range]{ accent-color:var(--accent); width:170px; } .cols{ font-variant-numeric:tabular-nums; min-width:3ch; display:inline-block; }
+  .style{ display:grid; gap:10px; } .style-head{ display:flex; flex-wrap:wrap; gap:8px 16px; align-items:baseline; justify-content:space-between; } .style-head p{ font-size:14px; }
+  .pick{ display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer; } .pick input{ accent-color:var(--accent); width:16px; height:16px; }
+  .term{ background:var(--term-bg); color:var(--term-fg); border:1px solid var(--term-frame); border-radius:8px; padding:10px 12px; overflow-x:auto; font:400 13px/1.45 "JetBrains Mono",ui-monospace,Menlo,monospace; box-shadow: inset 0 0 0 1px rgba(255,255,255,.03), 0 12px 32px rgba(0,0,0,.35); }
+  .term pre{ margin:0; font:inherit; white-space:pre; }
+  .g{ color:var(--term-green); } .r{ color:var(--term-red); } .y{ color:var(--term-yellow); } .c{ color:var(--term-cyan); } .v{ color:var(--term-violet); } .d{ color:var(--term-dim); } .b{ font-weight:700; } .w{ color:#fff; }
+  .hl{ background:var(--term-hl); } .hlr{ background:var(--term-hlr); } .dd{ color:#2f3743; } .gl{ color:#2f6a4c; } .m{ color:#8b949e; }
+  .chosen{ border:1px solid var(--accent); border-radius:8px; padding:12px 14px; background:var(--panel); font-size:14px; } .chosen code{ font:500 13px "JetBrains Mono",monospace; background:var(--ground); padding:2px 6px; border-radius:4px; }
+  .notes{ display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; } .note{ border-top:2px solid var(--line); padding-top:10px; font-size:14px; display:grid; gap:4px; } .note strong{ font-weight:500; color:var(--ink); }
+  .seg button[aria-pressed="true"]{ background:var(--accent) !important; color:var(--accent-ink) !important; }
+  .legend{ display:flex; flex-wrap:wrap; gap:6px 18px; font:13px "JetBrains Mono",monospace; color:var(--ink-2); }
+</style>
+<main>
+  <header>
+    <span class="eyebrow">telltale v0.2 · agents 面板 · 第二輪試衣 · v10</span>
+    <h1>一個 cell 一個任務，cell 裡動態長出流程圖，鏡頭跟著走</h1>
+    <p>同一段模擬：main 這一輪做事（思考 → 工具 → 思考 → 工具…），中途派出 subagent，每個 subagent 是一個新 cell，用一模一樣的表示畫它自己的流程。光點的規則改成你說的：只有 A → B 那一條在 B 抵達前（0.6 秒）有光點流動，光點到了、B 確定收到，光點停止、B 亮起、A 壓灰；其他連線靜止。另外：節點打字機、目前節點呼吸、完成的 cell 三秒後收成一列、新 cell 滑入。顏色改成一套：綠＝進行中、藍＝細節／時間、琥珀＝main、紫＝subagent、紅＝失敗、灰階三級＝過去式。</p>
+    <div class="legend"><span><span class="g">◉</span> 目前節點（呼吸）</span><span><span class="g">◆</span><span class="gl">·</span> 光點＋尾巴</span><span><span class="v">think</span> <span class="c">工具</span> <span class="y">Agent</span> <span class="g">reply</span> 節點依種類上色</span><span><span class="y">main</span> / <span class="v">subagent</span></span><span><span class="c">12s</span> 時間</span><span><span class="r">✗</span> 失敗</span></div>
+  </header>
+  <div class="bar" role="group" aria-label="控制">
+    <label>寬度 <input type="range" id="cols" min="60" max="160" value="120"> <span class="cols" id="colsv">120</span> 欄</label>
+    <label>高度 <input type="range" id="rows" min="6" max="24" value="12"> <span class="cols" id="rowsv">12</span> 列（Pane 給的高度）</label>
+    <button class="act" id="spawn">派一個 subagent</button>
+    <button class="act" id="fail">讓一個失敗</button>
+    <button class="act" id="reset">重來</button>
+    <button class="act" id="pause" aria-pressed="false">暫停</button>
+  </div>
+
+  <section class="style"><div class="style-head"><div><h2>自適應：貼在畫面四邊任一邊，樣式可切</h2><p>模擬 150×40 的終端。top／bottom／left／right 四個按鈕決定 mod 貼在哪一邊（每一邊都有自己的收合），V1+V4／V2+V4／V4 決定 cell 長相；兩組互相獨立，任何樣式都能放任何一邊。「開合」拉到底就是把整個高度或寬度交給面板。未來新的 mod 一樣用這四邊。</p></div>
+    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><span class="seg" id="mode" style="display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden"><button class="act" style="border:0;border-radius:0" aria-pressed="false" data-m="top">top</button><button class="act" style="border:0;border-radius:0" aria-pressed="true" data-m="bottom">bottom</button><button class="act" style="border:0;border-radius:0" aria-pressed="false" data-m="left">left</button><button class="act" style="border:0;border-radius:0" aria-pressed="false" data-m="right">right</button></span><span class="seg" id="mstyle" style="display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden"><button class="act" style="border:0;border-radius:0" aria-pressed="true" data-s="V14">v1</button><button class="act" style="border:0;border-radius:0" aria-pressed="false" data-s="V24">v2</button><button class="act" style="border:0;border-radius:0" aria-pressed="false" data-s="V4">v4</button></span><label style="font-size:13px;color:var(--ink-2)">開合 <input type="range" id="open" min="2" max="36" value="10"> <span class="cols" id="openv">10</span></label></div></div><div class="term"><pre id="tmock"></pre></div></section>
+  <section class="style"><div class="style-head"><div><h2>v1 · 方框節點，跑馬燈鎖右（原 V1＋V4）</h2><p>第一列照 v4：分隔線＋標題＋任務名稱（main 是這輪的 prompt，subagent 是它的 description；太長就跑馬燈）；底下三列是方框鏈，最新節點鎖在右側、舊的往左流；完成後只剩第一列。</p></div><label class="pick"><input type="radio" name="pick" value="v1">選這個</label></div><div class="term"><pre id="t14"></pre></div></section>
+  <section class="style"><div class="style-head"><div><h2>v2 · 直管線，最新節點鎖底（原 V2＋V4）</h2><p>標題列只放名字、模型、時間；任務名稱換到 cell 內第一行，整行寬度都給它，還是放不下就跑馬燈；直管線，最新節點永遠在 cell 最底一列，舊的往上推；完成後縮成窄直欄。</p></div><label class="pick"><input type="radio" name="pick" value="v2">選這個</label></div><div class="term"><pre id="t24"></pre></div></section>
+  <section class="style"><div class="style-head"><div><h2>V1 · 橫向流程，鏡頭水平跟</h2><p>cell 是一條橫向的軌，節點左→右長出來（方框從一點展開），連線上光點帶尾巴流向目前節點；超出 cell 寬度時整條往左滑。cell 上下堆疊，完成的收成一列。</p></div><label class="pick"><input type="radio" name="pick" value="V1">選這個</label></div><div class="term"><pre id="t1"></pre></div></section>
+  <section class="style"><div class="style-head"><div><h2>V2 · 縱向流程，鏡頭垂直跟</h2><p>cell 是一根直的管線，節點由上往下長，連線上光點往下流、到達時目前節點亮一下；超過高度時往上捲。cell 左右並排。</p></div><label class="pick"><input type="radio" name="pick" value="V2">選這個</label></div><div class="term"><pre id="t2"></pre></div></section>
+  <section class="style"><div class="style-head"><div><h2>V3 · 蛇形折行，鏡頭跟最新一行</h2><p>節點左→右，滿一行折到下一行接著長（轉角也走光點），鏡頭只在行數超過 cell 高度時往上捲。cell 並排成格子。</p></div><label class="pick"><input type="radio" name="pick" value="V3">選這個</label></div><div class="term"><pre id="t3"></pre></div></section>
+  <section class="style"><div class="style-head"><div><h2>v4 · 兩列跑馬燈</h2><p>第一列是分隔線＋任務名稱（名字、模型、時間、這個任務是什麼），第二列是壓成一條鏈的流程，最新節點鎖在右側、舊的往左流；完成後只剩第一列。</p></div><label class="pick"><input type="radio" name="pick" value="v4">選這個</label></div><div class="term"><pre id="t4"></pre></div></section>
+
+  <div class="chosen" id="chosen" hidden></div>
+  <section class="notes">
+    <div class="note"><strong>動態清單（全部共用）</strong><span>事件到：先在 A → B 的連線上跑 0.6 秒光點（B 先以 `·` 佔位）；抵達：光點停、B 亮起（白粗體＋淡綠底、邊框呼吸）、名字逐字打出、A 與它的框壓灰；cell 完成：標題打 ✓、3 秒後收成一列摘要、60 秒後消失；失敗：節點 ✗、cell 邊框紅、底色淡紅、留到點掉。</span></div>
+    <div class="note"><strong>鏡頭</strong><span>每幀往目標位移 12%（ease-out）；新 cell 從右緣滑入 0.5 秒。</span></div>
+    <div class="note"><strong>真機限制</strong><span>subagent 內部的工具事件要靠 `turn.step` 帶 `agentId`；若實測拿不到，subagent 的 cell 只有 spawned → running → done 三個節點。底色（tint）要看 Text 的 backgroundColor 是否可用（型別檔有）。</span></div>
+  </section>
+</main>
+<script>
+(() => {
+  const isWide = cp => (cp >= 0x1100 && cp <= 0x115f) || (cp >= 0x2e80 && cp <= 0xa4cf) || (cp >= 0xac00 && cp <= 0xd7a3) || (cp >= 0xf900 && cp <= 0xfaff) || (cp >= 0xfe30 && cp <= 0xfe4f) || (cp >= 0xff00 && cp <= 0xff60);
+  const dw = s => { let w = 0; for (const ch of s) w += isWide(ch.codePointAt(0)) ? 2 : 1; return w; };
+  const fit = (s, n) => { if (dw(s) <= n) return s; let o = "", w = 0; for (const ch of s) { const c = isWide(ch.codePointAt(0)) ? 2 : 1; if (w + c > n - 1) break; o += ch; w += c; } return o + "…"; };
+  const pad = (s, n) => s + " ".repeat(Math.max(0, n - dw(s)));
+  const esc = s => s.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  const el = (t, c) => `<span class="${c}">${esc(t)}</span>`;
+  const win = (html, off, w) => { let out = "", x = 0, inTag = false; for (let i = 0; i < html.length; i++) { const ch = html[i]; if (inTag) { out += ch; if (ch === ">") inTag = false; continue; } if (ch === "<") { inTag = true; out += ch; continue; } if (ch === "&") { const j = html.indexOf(";", i); const ent = html.slice(i, j + 1); if (x >= off && x < off + w) out += ent; x++; i = j; continue; } if (x >= off && x < off + w) out += ch; x++; } if (x < off + w) out += " ".repeat(off + w - Math.max(x, off)); return out; };
+
+  // ---------- simulation ----------
+  const SPIN = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏";
+  const STEP_POOL = [["think", 1800], ["Read", 900], ["Bash make check", 4200], ["think", 1500], ["Edit", 1200], ["Grep", 700], ["Bash bun test", 3200], ["think", 1600], ["Edit", 1400], ["reply", 0]];
+  let simNow = 0, paused = false, last = performance.now(), frame = 0, nextId = 1;
+  const tasks = [];
+  const mkTask = (label, kind, plan, desc) => ({ id: nextId++, label, kind, desc, status: "running", firstAt: simNow, endAt: null, bornAt: simNow, steps: [{ name: "prompt", t0: simNow, t1: simNow }], plan: plan.slice(), cursor: 0, nextAt: simNow + 800, cam: {}, flashUntil: simNow + 1000 });
+  const DESCS = { review: "spec review of ticket 05", explore: "find every caller of layout()", impl: "implement ticket 06 in a worktree", verify: "adversarially verify finding #3", docs: "update README validate block" };
+  const spawnSub = () => { const names = ["review", "explore", "impl", "verify", "docs"]; const n = names[nextId % names.length]; const plan = STEP_POOL.slice(0, 3 + (nextId % 6)).concat([["reply", 0]]); tasks.push(mkTask(n, "sub", plan, DESCS[n])); };
+  const advance = t => {
+    if (t.status !== "running" || simNow < t.nextAt) return;
+    const cur = t.steps[t.steps.length - 1]; if (cur.t1 == null) cur.t1 = simNow;
+    if (t.cursor >= t.plan.length) { t.status = "completed"; t.endAt = simNow; t.flashUntil = simNow + 1000; return; }
+    const [name, dur] = t.plan[t.cursor++];
+    if (name === "spawn") { spawnSub(); t.steps.push({ name: "Agent", t0: simNow, t1: null }); t.nextAt = simNow + 600; return; }
+    t.steps.push({ name, t0: simNow, t1: name === "reply" ? simNow : null }); t.flashUntil = simNow + 600;
+    t.nextAt = simNow + (name === "reply" ? 400 : dur);
+  };
+  const failOne = () => { const t = tasks.find(x => x.status === "running" && x.kind === "sub") || tasks.find(x => x.status === "running"); if (!t) return; t.status = "failed"; t.endAt = simNow; t.flashUntil = simNow + 1000; const c = t.steps[t.steps.length - 1]; if (c.t1 == null) c.t1 = simNow; };
+  const MAIN_PLAN = [["think", 1800], ["Read", 900], ["spawn", 0], ["Bash make check", 4200], ["spawn", 0], ["think", 1500], ["Edit", 1200], ["spawn", 0], ["Bash bun test", 3200], ["think", 1600], ["Edit", 1400], ["Read", 800], ["reply", 0]];
+  const MAIN_DESC = "把 agents 面板做完，先跑 make check";
+  const reset = () => { tasks.length = 0; simNow = 0; nextId = 1; tasks.push(mkTask("main", "main", MAIN_PLAN, MAIN_DESC)); };
+  const tick = dt => { simNow += dt; for (const t of tasks) advance(t); for (let i = tasks.length - 1; i >= 0; i--) { const t = tasks[i]; if (t.status === "completed" && simNow - t.endAt > 60000) tasks.splice(i, 1); } if (tasks.every(t => t.status !== "running") && simNow - Math.max(0, ...tasks.map(t => t.endAt ?? 0)) > 4000) tasks.push(mkTask("main", "main", MAIN_PLAN.slice(0, 8).concat([["reply", 0]]), "把 README 的 validate 區塊更新到 2.1.274")); };
+  const MARGIN_RIGHT = 2 * 12 + 4; // keep the newest node this far from the right edge (two node widths)
+  const ease = (t, key, target) => { const cur = t.cam[key] ?? target; const nxt = Math.abs(target - cur) < 1 ? target : cur + (target - cur) * 0.25; t.cam[key] = nxt; return Math.round(nxt); };
+  const elapsed = ms => { const s = Math.max(0, Math.floor(ms / 1000)); return s < 60 ? s + "s" : Math.floor(s / 60) + "m" + String(s % 60).padStart(2, "0"); };
+
+  // ---------- shared visual vocabulary ----------
+  const breathe = () => (Math.floor(simNow / 600) % 2 === 0);                    // current node breathes every 0.6 s
+  const age = s => simNow - s.t0;                                                  // ms since the node was born
+  const reveal = (s, n) => { const a = age(s); if (a >= 400) return n; const k = Math.max(1, Math.ceil(n.length * a / 400)); return n.slice(0, k); }; // typewriter
+  const born = s => age(s) < 400;
+  const justDone = s => s.t1 != null && simNow - s.t1 < 300;                       // the edge into a finished step flashes white
+  const shortName = n => n.split(" ")[0], detail = n => n.includes(" ") ? n.slice(n.indexOf(" ") + 1) : "";
+  const isHead = (t, i) => i === t.steps.length - 1;
+  const TRANSIT = 600;                                                            // ms the packet takes from A to B
+  const inTransit = t => t.steps.length > 1 && age(t.steps[t.steps.length - 1]) < TRANSIT && t.status === "running";
+  const curIx = t => inTransit(t) ? t.steps.length - 2 : t.steps.length - 1;    // the lit node: A until B has received
+  const isCur = (t, i) => i === curIx(t);
+  // node colour by what it is: think=violet, tool=blue, Agent=amber, reply=green, prompt=grey; dims when the cell is over
+  const kindCls = (t, s) => { if (t.status !== "running") return "dd"; const n = shortName(s.name); return n === "think" ? "v" : n === "Agent" ? "y" : n === "reply" ? "g" : n === "prompt" ? "m" : "c"; };
+  const nodeCls = (t, i) => isCur(t, i) ? "w b" : i > curIx(t) ? "dd" : t.status === "running" ? "m" : "dd"; // done nodes are pressed grey
+  const frameCls = t => t.status === "running" ? (simNow < t.flashUntil ? "g b" : "gl") : t.status === "failed" ? "r b" : "dd";
+  const nameCls = t => t.kind === "main" ? "y" : "v";
+  const title = t => { const g = t.status === "running" ? SPIN[frame % 10] : t.status === "failed" ? "✗" : "✓"; return [el(g + " ", t.status === "running" ? "g" : t.status === "failed" ? "r" : "d"), el(t.label, t.status === "running" ? nameCls(t) + " b" : "d"), el(t.kind === "sub" ? " sonnet" : " opus", t.status === "running" ? "m" : "dd"), el(" " + elapsed((t.endAt ?? simNow) - t.firstAt), t.status === "running" ? "c" : "dd")]; };
+  const titlePlain = t => `${t.status === "running" ? "⠋" : "✓"} ${t.label} ${t.kind === "sub" ? "sonnet" : "opus"} ${elapsed((t.endAt ?? simNow) - t.firstAt)}`;
+  const marquee = (text, w) => { if (dw(text) <= w) return pad(text, w); const loop = [...(text + "   ·   ")]; const total = loop.reduce((n, ch) => n + dw(ch), 0); let off = Math.floor(simNow / 300) % total, out = "", used = 0, i = 0, skipped = 0; while (skipped < off) { skipped += dw(loop[i % loop.length]); i++; } while (used < w) { const ch = loop[i % loop.length]; const cw = dw(ch); if (used + cw > w) break; out += ch; used += cw; i++; } return pad(out, w); };
+  const doing = t => t.desc; // the task's own name: main shows the prompt, a subagent shows its description (AgentInfo.description)
+  const slideIn = t => Math.max(0, Math.round((1 - Math.min(1, (simNow - t.bornAt) / 500)) * 14));
+  const collapsed = t => t.status === "completed" && simNow - t.endAt > 3000;
+  const summary = t => t.steps.map(s => shortName(s.name)).join(" ▸ ");
+  // node glyph + classes: head breathes; born nodes are a dot; failed head is ✗
+  const glyph = (t, i) => { const s = t.steps[i]; if (isHead(t, i) && t.status === "failed") return ["✗", "r b"]; if (i > curIx(t)) return ["·", "dd"]; if (isCur(t, i) && t.status === "running") return ["◉", breathe() ? "g b" : "g"]; return ["●", t.status === "running" ? kindCls(t, s) : "dd"]; };
+  const edge = (t, i, len) => { // edge from step i to i+1: a packet rides it only while i+1 is arriving; then it rests
+    const nxt = t.steps[i + 1], arriving = isHead(t, i + 1) && inTransit(t);
+    if (!arriving) return el("─".repeat(len - 1) + "▸", t.status === "running" ? (i + 1 === curIx(t) ? "g" : "d") : "dd");
+    const p = Math.min(len - 1, Math.floor(age(nxt) / TRANSIT * len)); let s = "";
+    for (let k = 0; k < len; k++) { const d = p - k; s += d === 0 ? "◆" : d === 1 || d === 2 ? "·" : k === len - 1 ? "▸" : "─"; }
+    return s.split("").map(ch => el(ch, ch === "◆" ? "g b" : ch === "·" ? "gl" : "gl")).join("");
+  };
+
+  // ---------- V1 horizontal ----------
+  const renderV1 = (t, w) => {
+    const inner = w - 2, fc = frameCls(t), sl = slideIn(t);
+    if (collapsed(t)) return [" ".repeat(sl) + el("└ ", "dd") + title(t).join("") + el("  " + fit(summary(t), inner - 30), "dd")];
+    let top = "", mid = "", bot = "", det = "";
+    t.steps.forEach((s, i) => {
+      const head = isCur(t, i), arriving = i > curIx(t), [g, gc] = glyph(t, i); const a2 = Math.max(0, age(s) - TRANSIT); const bw = arriving ? 3 : a2 < 400 ? Math.max(3, Math.ceil(12 * a2 / 400)) : 12; const nm = shortName(s.name); const name = pad(fit(arriving ? "" : a2 < 400 ? nm.slice(0, Math.max(1, Math.ceil(nm.length * a2 / 400))) : nm, bw - 4), bw - 4);
+      const bc = head ? (t.status === "failed" ? "r b" : breathe() ? "g b" : "g") : arriving ? "dd" : t.status === "running" ? "d" : "dd"; const tint = head ? (t.status === "failed" ? " hlr" : t.status === "running" ? " hl" : "") : "";
+      top += el("┌" + "─".repeat(bw - 2) + "┐", bc) + " ".repeat(12 - bw);
+      mid += el("│", bc) + `<span class="${tint}">` + el(g + " ", gc) + el(name, nodeCls(t, i)) + "</span>" + el("│", bc) + " ".repeat(12 - bw);
+      bot += el("└" + "─".repeat(bw - 2) + "┘", bc) + " ".repeat(12 - bw);
+      const dtext = detail(s.name) || (s.t1 == null ? elapsed(simNow - s.t0) : elapsed(s.t1 - s.t0));
+      det += el(pad(fit(arriving ? "" : dtext, 11), 12), head ? "c b" : arriving ? "dd" : t.status === "running" ? "d" : "dd");
+      if (!isHead(t, i)) { top += "    "; mid += edge(t, i, 4); bot += "    "; det += "    "; }
+    });
+    const stripW = t.steps.length * 12 + (t.steps.length - 1) * 4, off = ease(t, "x", Math.max(0, stripW - inner + MARGIN_RIGHT));
+    const L = el("│", fc), R = el("│", fc);
+    const head = el("┌ ", fc) + title(t).join("") + el(" " + "─".repeat(Math.max(0, inner - 4 - dw(titlePlain(t)))) + "┐", fc);
+    return [head, L + win(top, off, inner) + R, L + win(mid, off, inner) + R, L + win(bot, off, inner) + R, L + win(det, off, inner) + R, el("└" + "─".repeat(inner) + "┘", fc)].map(l => " ".repeat(sl) + l);
+  };
+  // ---------- V2 vertical ----------
+  const renderV2 = (t, w, h) => {
+    const inner = w - 2, fc = frameCls(t), rows = [];
+    t.steps.forEach((s, i) => { const head = isCur(t, i), arriving = i > curIx(t), [g, gc] = glyph(t, i); const tint = head ? (t.status === "failed" ? "hlr" : t.status === "running" ? "hl" : "") : "";
+      const name = pad(fit(arriving ? "" : reveal({ t0: s.t0 + TRANSIT }, shortName(s.name)), 10), 10), dt = detail(s.name), tm = s.t1 == null ? elapsed(simNow - s.t0) : elapsed(s.t1 - s.t0);
+      rows.push(`<span class="${tint}">` + el(" " + g + " ", gc) + el(name, nodeCls(t, i)) + el(pad(fit(arriving ? "" : dt, inner - 22), inner - 22), head ? "m" : "dd") + el(pad(arriving ? "" : tm, 7), head ? "c b" : t.status === "running" ? "d" : "dd") + "</span>");
+      if (!isHead(t, i)) { const arr = isHead(t, i + 1) && inTransit(t); const ph = Math.floor(age(t.steps[i + 1]) / TRANSIT * 3); rows.push(arr ? el(" " + (ph === 0 ? "◆" : ph === 1 ? "╎" : "◆"), "g b") : el(" │", t.status === "running" ? (i + 1 === curIx(t) ? "g" : "d") : "dd")); }
+    });
+    const body = h - 2, off = ease(t, "y", Math.max(0, rows.length - body));
+    const out = [el("┌ ", fc) + title(t).join("") + el(" " + "─".repeat(Math.max(0, inner - 4 - dw(titlePlain(t)))) + "┐", fc)];
+    for (let r = 0; r < body; r++) out.push(el("│", fc) + win(rows[r + off] ?? "", 0, inner) + el("│", fc));
+    out.push(el("└" + "─".repeat(inner) + "┘", fc)); return out;
+  };
+  // ---------- V3 snake ----------
+  const renderV3 = (t, w, h) => {
+    const inner = w - 2, fc = frameCls(t), per = Math.max(1, Math.floor((inner - 1) / 14)), rows = []; let line = " ", count = 0;
+    t.steps.forEach((s, i) => { const head = isCur(t, i), arriving = i > curIx(t), [g, gc] = glyph(t, i); const tint = head ? (t.status === "failed" ? "hlr" : t.status === "running" ? "hl" : "") : "";
+      line += `<span class="${tint}">` + el(g, gc) + el(pad(fit(arriving ? "" : reveal({ t0: s.t0 + TRANSIT }, shortName(s.name)), 9), 9), nodeCls(t, i)) + "</span>"; count++;
+      if (!isHead(t, i)) { const arr = isHead(t, i + 1) && inTransit(t), ec = t.status === "running" ? (i + 1 === curIx(t) ? "g" : "d") : "dd";
+        if (count % per === 0) { const ph = Math.floor(age(t.steps[i + 1]) / TRANSIT * 4); rows.push(line + el(arr && ph === 0 ? "◆" : "┐", arr && ph === 0 ? "g b" : ec)); rows.push(" ".repeat(inner - 1) + el(arr && ph === 1 ? "◆" : "│", arr && ph === 1 ? "g b" : ec)); rows.push(el("└" + (arr && ph >= 2 ? "─".repeat(Math.max(0, inner - 3 - (ph - 2) * 8)) + "◆" + "─".repeat((ph - 2) * 8) : "─".repeat(inner - 2)) + "┘", ec)); line = " "; }
+        else line += edge(t, i, 4); }
+    });
+    rows.push(line);
+    const body = h - 2, off = ease(t, "y", Math.max(0, rows.length - body));
+    const out = [el("┌ ", fc) + title(t).join("") + el(" " + "─".repeat(Math.max(0, inner - 4 - dw(titlePlain(t)))) + "┐", fc)];
+    for (let r = 0; r < body; r++) out.push(el("│", fc) + win(rows[r + off] ?? "", 0, inner) + el("│", fc));
+    out.push(el("└" + "─".repeat(inner) + "┘", fc)); return out;
+  };
+  // ---------- V4 ticker ----------
+  const renderV4 = (t, w) => {
+    const fc = frameCls(t); const headTxt = titlePlain(t) + " · " + doing(t);
+    const rule = el("─ ", fc) + title(t).join("") + el(" · ", "d") + el(fit(doing(t), Math.max(4, w - dw(titlePlain(t)) - 8)), t.status === "running" ? "w" : "dd") + el(" " + "─".repeat(Math.max(0, w - dw(headTxt) - 5)), fc);
+    if (collapsed(t)) return [rule];
+    let chain = "";
+    t.steps.forEach((s, i) => { const head = isCur(t, i), arriving = i > curIx(t), [g, gc] = glyph(t, i); chain += el(g + " " + (arriving ? "·" : reveal({ t0: s.t0 + TRANSIT }, shortName(s.name))) + (head && detail(s.name) ? "(" + detail(s.name) + ")" : ""), nodeCls(t, i));
+      if (!isHead(t, i)) chain += " " + edge(t, i, 3) + " "; });
+    const plain = chain.replace(/<[^>]+>/g, ""), avail = w - 2, off = ease(t, "x", Math.max(0, dw(plain) - avail + 20));
+    return [rule, " " + win(chain, off, avail)];
+  };
+
+  // ---------- V14: V1 boxes with V4's ticker lock ----------
+  const renderV14 = (t, w) => {
+    const sl = slideIn(t), avail = w - sl - 1, fc = frameCls(t); const headTxt = titlePlain(t) + " · " + doing(t);
+    const rule = el("─ ", fc) + title(t).join("") + el(" · ", "d") + el(marquee(doing(t), Math.max(4, Math.min(dw(doing(t)), w - sl - dw(titlePlain(t)) - 8))), t.status === "running" ? "w" : "dd") + el(" " + "─".repeat(Math.max(0, w - sl - Math.min(dw(headTxt), w - sl - 8) - 5)), fc);
+    if (collapsed(t)) return [" ".repeat(sl) + rule];
+    let top = "", mid = "", bot = "";
+    t.steps.forEach((s, i) => { const head = isCur(t, i), arriving = i > curIx(t), [g, gc] = glyph(t, i); const nm = shortName(s.name); const a2 = Math.max(0, age(s) - TRANSIT); const bw = arriving ? 3 : a2 < 400 ? Math.max(3, Math.ceil(12 * a2 / 400)) : 12; const name = pad(fit(arriving ? "" : a2 < 400 ? nm.slice(0, Math.max(1, Math.ceil(nm.length * a2 / 400))) : nm, bw - 4), bw - 4);
+      const bc = head ? (t.status === "failed" ? "r b" : breathe() ? "g b" : "g") : arriving ? "dd" : t.status === "running" ? "d" : "dd"; const tint = head ? (t.status === "failed" ? " hlr" : t.status === "running" ? " hl" : "") : "";
+      top += el("┌" + "─".repeat(bw - 2) + "┐", bc) + " ".repeat(12 - bw); mid += el("│", bc) + `<span class="${tint}">` + el(g + " ", gc) + el(name, nodeCls(t, i)) + "</span>" + el("│", bc) + " ".repeat(12 - bw); bot += el("└" + "─".repeat(bw - 2) + "┘", bc) + " ".repeat(12 - bw);
+      if (!isHead(t, i)) { top += "    "; mid += edge(t, i, 4); bot += "    "; } });
+    const stripW = t.steps.length * 12 + (t.steps.length - 1) * 4, off = ease(t, "x", Math.max(0, stripW - avail + MARGIN_RIGHT));
+    return [" ".repeat(sl) + rule, " ".repeat(sl) + " " + win(top, off, avail), " ".repeat(sl) + " " + win(mid, off, avail), " ".repeat(sl) + " " + win(bot, off, avail)];
+  };
+  // ---------- collapsed cell as a thin vertical strip (3 columns): ✓ then the label letter by letter ----------
+  const STRIP_W = 8;
+  const renderStrip = (t, h) => { const g = t.status === "failed" ? "✗" : "✓", gc = t.status === "failed" ? "r b" : "d"; const out = [el(g + " ", gc) + el(pad(fit(t.label, STRIP_W - 2), STRIP_W - 2), t.status === "failed" ? "r" : "m")]; const names = t.steps.map(x => shortName(x.name)); const room = h - 1; const shown = names.length > room ? names.slice(0, room - 1) : names; for (const n of shown) out.push(el("  " + pad(fit(n, STRIP_W - 2), STRIP_W - 2), "dd")); if (names.length > room) out.push(el("  " + pad("+" + (names.length - shown.length), STRIP_W - 2), "dd")); while (out.length < h) out.push(" ".repeat(STRIP_W)); return out.slice(0, h); };
+  // ---------- V24: V2 column with V4's lock (newest node always on the last row) ----------
+  const renderV24 = (t, w, h) => {
+    const inner = w - 2, fc = frameCls(t), rows = [];
+    t.steps.forEach((s, i) => { const head = isCur(t, i), arriving = i > curIx(t), [g, gc] = glyph(t, i); const tint = head ? (t.status === "failed" ? "hlr" : t.status === "running" ? "hl" : "") : ""; const bc = head ? (breathe() ? "g b" : "g") : arriving ? "dd" : t.status === "running" ? "d" : "dd";
+      const nm = arriving ? "" : reveal({ t0: s.t0 + TRANSIT }, shortName(s.name)); const box = "[ " + pad(fit(nm, 9), 9) + " ]";
+      rows.push(`<span class="${tint}">` + el(" " + g + " ", gc) + el(box.slice(0, 2), bc) + el(box.slice(2, -2), nodeCls(t, i)) + el(box.slice(-2), bc) + el(" " + pad(fit(arriving ? "" : detail(s.name), inner - 26), inner - 26), head ? "m" : "dd") + el(pad(arriving ? "" : s.t1 == null ? elapsed(simNow - s.t0) : elapsed(s.t1 - s.t0), 6), head ? "c b" : t.status === "running" ? "d" : "dd") + "</span>");
+      if (!isHead(t, i)) { const arr = isHead(t, i + 1) && inTransit(t); const ph = Math.floor(age(t.steps[i + 1]) / TRANSIT * 2); rows.push(arr ? el("   " + (ph === 0 ? "◆" : "╎"), "g b") : el("   │", t.status === "running" ? (i + 1 === curIx(t) ? "g" : "d") : "dd")); } });
+    const body = h - 3, off = Math.max(0, rows.length - body); // hard lock: no easing, newest row is always the bottom row (one row is the description)
+    const out = [el("┌ ", fc) + title(t).join("") + el(" " + "─".repeat(Math.max(0, inner - 4 - dw(titlePlain(t)))) + "┐", fc)];
+    out.push(el("│", fc) + el(" " + marquee(doing(t), inner - 2) + " ", t.status === "running" ? "w" : "dd") + el("│", fc));
+    for (let r = 0; r < body; r++) out.push(el("│", fc) + win(rows[r + off] ?? "", 0, inner) + el("│", fc));
+    out.push(el("└" + "─".repeat(inner) + "┘", fc)); return out;
+  };
+
+  // ---------- any style into a w×h region (used by every edge) ----------
+  const composeRegion = (style, w, h) => {
+    const out = [];
+    if (style === "V14" || style === "V4") { let used = 0; for (const t of tasks) { const b = style === "V14" ? renderV14(t, w) : renderV4(t, w); if (used + b.length > h) { out.push(el(` … +${tasks.length - tasks.indexOf(t)} more`, "d")); break; } out.push(...b); used += b.length; } }
+    else { // V24: finished cells as narrow step lists, open cells as columns; side by side when wide, stacked when narrow
+      const done = tasks.filter(collapsed), open = tasks.filter(t => !collapsed(t)); const cw = Math.min(40, w); const wide = w >= 2 * (cw + 1) + done.length * (STRIP_W + 1);
+      if (wide) { const stripsW = done.length * (STRIP_W + 1), per = Math.max(1, Math.floor((w - stripsW) / (cw + 1))); const blocks = done.map(t => renderStrip(t, h)).concat(open.slice(0, per).map(t => renderV24(t, cw, h))); for (let r = 0; r < h; r++) out.push(blocks.map((b, k) => b[r] ?? " ".repeat(k < done.length ? STRIP_W : cw)).join(" ")); if (open.length > per) out[out.length - 1] += el(` +${open.length - per}`, "d"); }
+      else { const perRow = Math.max(1, Math.floor(w / (STRIP_W + 1))); const shelfRows = Math.ceil(done.length / perRow); const shelfH = done.length ? Math.min(shelfRows * 9, Math.floor(h / 2)) : 0; for (let g = 0; g < shelfRows && out.length < shelfH; g++) { const grp = done.slice(g * perRow, (g + 1) * perRow).map(t => renderStrip(t, 9)); for (let r = 0; r < 9 && out.length < shelfH; r++) out.push(grp.map(b => b[r] ?? " ".repeat(STRIP_W)).join(" ")); }
+        const per = Math.max(1, Math.min(open.length, Math.floor((h - shelfH) / 5))), each = per ? Math.floor((h - shelfH) / per) : 0; for (const t of open.slice(0, per)) out.push(...renderV24(t, Math.max(20, w - 1), each)); if (open.length > per) out.push(el(` +${open.length - per}`, "d")); }
+    }
+    while (out.length < h) out.push(""); return out.slice(0, h).map(l => win(l, 0, w));
+  };
+  // ---------- adaptive mock: a 150×40 terminal with the panel at the bottom (V1+V4 rows) or on the left (V2+V4 columns) ----------
+  const transcript = (w, h) => { const lines = ["  ▝▜██████▀  Claude Code v2.1.274 · Fable 5.1 · ~/projects/telltale", "", "❯ 把 agents 面板做完，先跑 make check", "", "⏺ Bash(make check)", "  ⎿  56 passed · 72 pass · Validation passed", "", "⏺ Agent \"review\" · sonnet · running", "", "✻ Sauteing… (1m04s · 12.3k tokens)"]; const out = []; for (let r = 0; r < h; r++) out.push(el(pad(fit(lines[r] ?? "", w), w), "d")); return out; };
+  const composeMock = (edge, style, open, cols, rows) => {
+    const out = []; const prompt = [el("─".repeat(cols), "d"), el("❯ ", "m") + el("█", "g")];
+    const running = tasks.filter(t => t.status === "running").length;
+    const rule = w => el("─ agents ", "d") + el("·", "dd") + el(" " + running + " running ", "g") + el("─".repeat(Math.max(0, w - 22 - 4)), "d") + el(" [-]", "d");
+    if (edge === "top" || edge === "bottom") {
+      const panelRows = Math.min(rows - 5, Math.max(2, open)); const body = composeRegion(style, cols, panelRows); const ts = transcript(cols, rows - panelRows - 3);
+      if (edge === "top") out.push(rule(cols), ...body, ...ts); else out.push(...ts, rule(cols), ...body);
+      out.push(...prompt);
+    } else {
+      const dockW = Math.min(cols - 30, Math.max(20, open)); const h = rows - 2; const body = composeRegion(style, dockW, h - 1); const ts = transcript(cols - dockW - 2, h); const col = [win(rule(dockW), 0, dockW), ...body];
+      for (let r = 0; r < h; r++) out.push(edge === "left" ? col[r] + el(" │", "dd") + ts[r] : ts[r] + el("│ ", "dd") + col[r]);
+      out.push(...prompt);
+    }
+    return out.slice(0, rows).join("\n");
+  };
+
+  // ---------- layout of cells ----------
+  const compose = (variant, cols, rows) => {
+    const out = [`${el("telltale · agents", "d")}${" ".repeat(Math.max(1, cols - 18 - 3))}${el("[-]", "d")}`];
+    const live = tasks.slice();
+    if (variant === 1) { let used = 0; for (const t of live) { const block = renderV1(t, cols); if (used + block.length > rows - 1) { out.push(el(` … +${live.length - live.indexOf(t)} more`, "d")); break; } out.push(...block); used += block.length; } }
+    else if (variant === 2 || variant === 3) { const cw = variant === 2 ? 36 : 44, per = Math.max(1, Math.floor(cols / (cw + 1))), h = rows - 1, shown = live.slice(0, per);
+      const blocks = shown.map(t => variant === 2 ? renderV2(t, cw, h) : renderV3(t, cw, h));
+      for (let r = 0; r < h; r++) out.push(blocks.map(b => b[r] ?? " ".repeat(cw)).join(" "));
+      if (live.length > per) out[out.length - 1] += el(` +${live.length - per}`, "d"); }
+    else if (variant === 14) { let used = 0; for (const t of live) { const b = renderV14(t, cols); if (used + b.length > rows - 1) { out.push(el(` … +${live.length - live.indexOf(t)} more`, "d")); break; } out.push(...b); used += b.length; } }
+    else if (variant === 24) { const cw = 40, h = rows - 1; const done = live.filter(collapsed), open = live.filter(t => !collapsed(t)); const stripsW = done.length * (STRIP_W + 1); const per = Math.max(1, Math.floor((cols - stripsW) / (cw + 1))); const blocks = done.map(t => renderStrip(t, h)).concat(open.slice(0, per).map(t => renderV24(t, cw, h))); for (let r = 0; r < h; r++) out.push(blocks.map((b, k) => b[r] ?? " ".repeat(k < done.length ? STRIP_W : cw)).join(" ")); if (open.length > per) out[out.length - 1] += el(` +${open.length - per}`, "d"); }
+    else { let used = 0; for (const t of live) { const b = renderV4(t, cols); if (used + b.length > rows - 1) break; out.push(...b); used += b.length; } }
+    while (out.length < rows) out.push("");
+    return out.slice(0, rows).join("\n");
+  };
+
+  // ---------- controls ----------
+  const state = { cols: 120, rows: 12 };
+  const bind = (id, key, out) => { const i = document.getElementById(id), o = document.getElementById(out); i.addEventListener("input", () => { state[key] = +i.value; o.textContent = i.value; }); };
+  bind("cols", "cols", "colsv"); bind("rows", "rows", "rowsv");
+  state.mode = "bottom"; state.open = 10; bind("open", "open", "openv");
+  state.mstyle = "V14";
+  document.getElementById("mode").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; state.mode = b.dataset.m; for (const x of b.parentElement.children) x.setAttribute("aria-pressed", String(x === b)); const o = document.getElementById("open"); if (state.mode === "left" || state.mode === "right") { o.min = 20; o.max = 110; o.value = 48; } else { o.min = 2; o.max = 34; o.value = 10; } state.open = +o.value; document.getElementById("openv").textContent = o.value; });
+  document.getElementById("mstyle").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; state.mstyle = b.dataset.s; for (const x of b.parentElement.children) x.setAttribute("aria-pressed", String(x === b)); });
+  const TM = document.getElementById("tmock");
+  document.getElementById("spawn").addEventListener("click", spawnSub);
+  document.getElementById("fail").addEventListener("click", failOne);
+  document.getElementById("reset").addEventListener("click", reset);
+  const pb = document.getElementById("pause"); pb.addEventListener("click", () => { paused = !paused; pb.textContent = paused ? "繼續" : "暫停"; pb.setAttribute("aria-pressed", String(paused)); });
+  const chosen = document.getElementById("chosen");
+  for (const r of document.querySelectorAll('input[name="pick"]')) r.addEventListener("change", () => { chosen.hidden = false; chosen.innerHTML = `你選了 <strong>${r.value}</strong>。回 Claude Code 一句 <code>${r.value}</code> 就行；要混搭也直接說。`; try { localStorage.setItem("telltale-cell-pick", r.value); } catch (e) {} });
+  try { const p = localStorage.getItem("telltale-cell-pick"); if (p) { const r = document.querySelector(`input[name="pick"][value="${p}"]`); if (r) { r.checked = true; r.dispatchEvent(new Event("change")); } } } catch (e) {}
+  const T = [1, 2, 3, 4, 14, 24].map(i => document.getElementById("t" + i));
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches; let acc = 0;
+  reset(); for (let i = 0; i < 90; i++) tick(100); // open mid-flight
+  const loop = now => { const dt = Math.min(200, now - last); last = now; if (!paused) { tick(dt); acc += dt; if (acc >= (reduce ? 400 : 90)) { frame++; acc = 0; } }
+    [1, 2, 3, 4, 14, 24].forEach((v, k) => { T[k].innerHTML = compose(v, state.cols, state.rows); }); TM.innerHTML = composeMock(state.mode, state.mstyle, state.open, 150, 40); requestAnimationFrame(loop); };
+  requestAnimationFrame(loop);
+})();
+</script>

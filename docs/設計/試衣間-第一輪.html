@@ -1,0 +1,441 @@
+<title>telltale 樣式試衣間</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+  :root{
+    --ground:#f3f1ec; --ink:#1f2126; --ink-2:#5b5f68; --line:#d9d5cc; --panel:#ffffff;
+    --accent:#b8791c; --accent-ink:#fff;
+    --term-bg:#0d0f12; --term-fg:#d7dbe0; --term-dim:#5f6774; --term-green:#7fd18b; --term-red:#e06c6c; --term-yellow:#e6c15a; --term-frame:#2a2f36;
+    --term-tint:rgba(127,209,139,.10);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){ --ground:#14161a; --ink:#e6e2d8; --ink-2:#9aa0aa; --line:#2a2e35; --panel:#1b1e24; --accent:#e0a23a; --accent-ink:#1a1408; }
+  }
+  :root[data-theme="dark"]{ --ground:#14161a; --ink:#e6e2d8; --ink-2:#9aa0aa; --line:#2a2e35; --panel:#1b1e24; --accent:#e0a23a; --accent-ink:#1a1408; }
+  body{ background:var(--ground); color:var(--ink); font:15px/1.55 "IBM Plex Sans",system-ui,sans-serif; padding:0 20px; padding-block:28px 60px; }
+  main{ max-width:1180px; margin:0 auto; display:grid; gap:22px; }
+  h1{ font:600 30px/1.1 "IBM Plex Sans Condensed","IBM Plex Sans",sans-serif; margin:0; text-wrap:balance; letter-spacing:-.01em; }
+  h2{ font:600 17px/1.2 "IBM Plex Sans Condensed",sans-serif; margin:0; letter-spacing:.01em; }
+  p{ margin:0; max-width:68ch; color:var(--ink-2); }
+  .eyebrow{ font:500 12px/1 "IBM Plex Sans",sans-serif; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); }
+  header{ display:grid; gap:10px; }
+  .bar{ position:sticky; top:0; z-index:2; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px 14px; display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center; }
+  .bar label{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-2); }
+  .seg{ display:inline-flex; border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+  .seg button{ background:transparent; color:var(--ink); border:0; padding:5px 11px; font:500 13px "IBM Plex Sans",sans-serif; cursor:pointer; }
+  .seg button[aria-pressed="true"]{ background:var(--accent); color:var(--accent-ink); }
+  .seg button:focus-visible, .act:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .act{ background:transparent; color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:5px 11px; font:500 13px "IBM Plex Sans",sans-serif; cursor:pointer; }
+  .act:hover{ border-color:var(--accent); }
+  input[type=range]{ accent-color:var(--accent); width:180px; }
+  .cols{ font-variant-numeric:tabular-nums; min-width:3ch; display:inline-block; }
+  .style{ display:grid; gap:10px; }
+  .style-head{ display:flex; flex-wrap:wrap; gap:8px 16px; align-items:baseline; justify-content:space-between; }
+  .style-head p{ font-size:14px; }
+  .pick{ display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer; }
+  .pick input{ accent-color:var(--accent); width:16px; height:16px; }
+  .term{ background:var(--term-bg); color:var(--term-fg); border:1px solid var(--term-frame); border-radius:6px; padding:10px 12px; overflow-x:auto; font:400 13px/1.45 "JetBrains Mono",ui-monospace,Menlo,monospace; }
+  .term pre{ margin:0; font:inherit; white-space:pre; }
+  .g{ color:var(--term-green); } .r{ color:var(--term-red); } .y{ color:var(--term-yellow); } .d{ color:var(--term-dim); }
+  .b{ font-weight:700; } .t{ background:var(--term-tint); } .l1{ color:#a9b0ba; } .l2{ color:#d7dbe0; } .l3{ color:#ffffff; }
+  .term .prompt{ color:var(--term-dim); }
+  .notes{ display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; }
+  .note{ border-top:2px solid var(--line); padding-top:10px; display:grid; gap:4px; font-size:14px; }
+  .note strong{ font-weight:500; color:var(--ink); }
+  .chosen{ border:1px solid var(--accent); border-radius:8px; padding:12px 14px; background:var(--panel); font-size:14px; }
+  .chosen code{ font:500 13px "JetBrains Mono",monospace; background:var(--ground); padding:2px 6px; border-radius:4px; }
+  @media (prefers-reduced-motion: reduce){ .term{ } }
+  @media (max-width:560px){ .bar{ gap:10px 14px; } input[type=range]{ width:120px; } }
+</style>
+
+<main>
+  <header>
+    <span class="eyebrow">telltale v0.2 · agents 面板</span>
+    <h1>六種呈現，同一段假資料，真的在動</h1>
+    <p>下面每個黑框是一條 telltale 帶子（最多 9 列）。同一套模擬的 session 同時餵給六種呈現——前三種（流程圖、狀態流、軌道）agent 本身會動，後三種是原本的 A／B／C：subagent 起停、背景 shell、主迴圈階段切換都是照 SDD §2.6 的規則跑的。切視圖、切段位、拉寬度、按事件按鈕看它們怎麼反應，然後在下面選一個。</p>
+  </header>
+
+  <div class="bar" role="group" aria-label="控制">
+    <label>視圖 <span class="seg" id="view"><button aria-pressed="true" data-v="lanes">lanes</button><button aria-pressed="false" data-v="tree">tree</button></span></label>
+    <label>段位 <span class="seg" id="stage"><button aria-pressed="false" data-s="summary">summary</button><button aria-pressed="false" data-s="compact">compact</button><button aria-pressed="true" data-s="full">full</button></span></label>
+    <label>寬度 <input type="range" id="cols" min="30" max="150" value="110"> <span class="cols" id="colsv">110</span> 欄</label>
+    <button class="act" id="spawn">派一個 agent</button>
+    <button class="act" id="finish">結束一個</button>
+    <button class="act" id="fail">讓一個失敗</button>
+    <button class="act" id="bg">開背景任務</button>
+    <button class="act" id="pause" aria-pressed="false">暫停</button>
+  </div>
+
+  <section class="style" id="G">
+    <div class="style-head">
+      <div><h2>G · trace 瀑布（照你給的參考圖）</h2><p>整輪是最上面的 trace，每個 agent／背景任務是它底下的 span；左緣是這輪開始、右緣是現在，span 的長度是真的時間。running 的 span 用會流動的斜紋填，done 的變實心，failed 變紅。跟 Jaeger／參考圖同一套語言。</p></div>
+      <label class="pick"><input type="radio" name="pick" value="G">選這個</label>
+    </div>
+    <div class="term"><pre id="termG"></pre></div>
+  </section>
+
+  <section class="style" id="H">
+    <div class="style-head">
+      <div><h2>H · cell 圖（照 terminal-poster 那兩支影片）</h2><p>一個任務一個方框 cell，main 在最左；cell 之間的連線有 ◆ 光點流動；running 的 cell 邊框上有一顆點繞著跑（每個 job 自己的 loop）；cell 多到超出寬度時「鏡頭」平滑跟到最近有變化的那格。</p></div>
+      <label class="pick"><input type="radio" name="pick" value="H">選這個</label>
+    </div>
+    <div class="term"><pre id="termH"></pre></div>
+  </section>
+
+  <section class="style" id="D">
+    <div class="style-head">
+      <div><h2>D · 流程圖</h2><p>main 是左邊的節點，每個 agent 是右邊一個節點，中間是連線；running 的連線上有光點在跑，done 的連線變暗，failed 的變成虛線紅。</p></div>
+      <label class="pick"><input type="radio" name="pick" value="D">選這個</label>
+    </div>
+    <div class="term"><pre id="termD"></pre></div>
+  </section>
+
+  <section class="style" id="E">
+    <div class="style-head">
+      <div><h2>E · 狀態流</h2><p>三欄狀態機 spawned → running → done／failed，agent 是晶片，狀態一變就從一欄滑到下一欄（約 0.6 秒），滑動本身就是「發生了什麼」。</p></div>
+      <label class="pick"><input type="radio" name="pick" value="E">選這個</label>
+    </div>
+    <div class="term"><pre id="termE"></pre></div>
+  </section>
+
+  <section class="style" id="F">
+    <div class="style-head">
+      <div><h2>F · 軌道</h2><p>每個 agent 是軌道上一個會跑的標記，running 的一直往右跑（速度＝活動量），done 停在終點打 ✓，failed 停在原地打 ✗。一眼看「誰還在動」。</p></div>
+      <label class="pick"><input type="radio" name="pick" value="F">選這個</label>
+    </div>
+    <div class="term"><pre id="termF"></pre></div>
+  </section>
+
+  <section class="style" id="A">
+    <div class="style-head">
+      <div><h2>A · 極簡單色（備選）</h2><p>綠／紅／暗／一般四階＋粗體。bar 只表達「活著多久」。</p></div>
+      <label class="pick"><input type="radio" name="pick" value="A">選這個</label>
+    </div>
+    <div class="term"><pre id="termA"></pre></div>
+  </section>
+
+  <section class="style" id="B">
+    <div class="style-head">
+      <div><h2>B · btop 式明度＋活動量</h2><p>label 依 agent 類型分明度，bar 用 ▁▃▅▇ 表示每 6 秒的工具呼叫量。</p></div>
+      <label class="pick"><input type="radio" name="pick" value="B">選這個</label>
+    </div>
+    <div class="term"><pre id="termB"></pre></div>
+  </section>
+
+  <section class="style" id="C">
+    <div class="style-head">
+      <div><h2>C · k9s 式高密度表格</h2><p>固定欄位、有欄名、running 列淡綠底。沒有時間軸，lanes／tree 切換對它無效。</p></div>
+      <label class="pick"><input type="radio" name="pick" value="C">選這個</label>
+    </div>
+    <div class="term"><pre id="termC"></pre></div>
+  </section>
+
+  <div class="chosen" id="chosen" hidden></div>
+
+  <section class="notes">
+    <div class="note"><strong>三個一樣的地方</strong><span>spinner 80 ms 一幀、經過時間每秒跳、狀態切換那列粗體 1 秒、completed 60 秒後消失、failed 留到點掉（這裡按「結束一個」會先收最舊的失敗列）。</span></div>
+    <div class="note"><strong>A 與 B 的差別</strong><span>B 多一條資料：每條 lane 的工具呼叫數時間序列。subagent 的呼叫數在 2.1.267 拿不到（只有主迴圈的 turn.step），這裡是模擬的；真做的話 subagent 的 bar 會退回 A 的樣子。</span></div>
+    <div class="note"><strong>C 的取捨</strong><span>一列塞最多資訊、不需要 lanes／tree 兩套排版，票 14／15 合成一張；代價是沒有時間感。</span></div>
+  </section>
+</main>
+
+<script>
+(() => {
+  // ---------- width helpers (CJK = 2 cells), same rules as hooks/width.ts ----------
+  const isWide = cp => (cp >= 0x1100 && cp <= 0x115f) || (cp >= 0x2e80 && cp <= 0xa4cf) || (cp >= 0xac00 && cp <= 0xd7a3) || (cp >= 0xf900 && cp <= 0xfaff) || (cp >= 0xfe30 && cp <= 0xfe4f) || (cp >= 0xff00 && cp <= 0xff60) || (cp >= 0xffe0 && cp <= 0xffe6);
+  const dw = s => { let w = 0; for (const ch of s) w += isWide(ch.codePointAt(0)) ? 2 : 1; return w; };
+  const fit = (s, n) => { if (dw(s) <= n) return s; let out = "", w = 0; for (const ch of s) { const cw = isWide(ch.codePointAt(0)) ? 2 : 1; if (w + cw > n - 1) break; out += ch; w += cw; } return out + "…"; };
+  const pad = (s, n) => s + " ".repeat(Math.max(0, n - dw(s)));
+  const rpad = (s, n) => " ".repeat(Math.max(0, n - dw(s))) + s;
+  const esc = s => s.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+  // ---------- simulated engine ----------
+  const SPIN = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏";
+  const PHASES = ["responding", "thinking", "tool-input", "tool-use", "tool-use", "responding"];
+  const TOOLS = ["Read", "Bash(make check)", "Edit", "Grep", "Bash(bun test)", "Agent"];
+  let simNow = 0, paused = false, last = performance.now(), frame = 0;
+  let nextId = 1;
+  const agents = [];   // {id,label,type,model,status,firstAt,endAt,flashUntil,parent,kind,activity[]}
+  const turn = { startedAt: 0, phase: "responding", tools: ["Read"], toolIx: 0 };
+  const names = [["review", "general-purpose", "sonnet"], ["explore", "Explore", "haiku"], ["impl", "general-purpose", "sonnet"], ["verify", "general-purpose", "sonnet"], ["docs", "haiku", "haiku"]];
+  const spawn = (kind = "agent", i) => {
+    const n = names[(i ?? nextId) % names.length];
+    agents.push({ id: "a" + (nextId++).toString(36).padStart(3, "0"), label: kind === "bg" ? "bg: " + ["make check", "bun test", "git push"][nextId % 3] : n[0], type: kind === "bg" ? "shell" : n[1], model: kind === "bg" ? "" : n[2], status: "running", firstAt: simNow, endAt: null, flashUntil: simNow + 1000, kind, activity: [] });
+  };
+  const endOne = status => {
+    const a = agents.find(x => x.status === "running" && x.kind !== "bg") || agents.find(x => x.status === "running");
+    if (!a) return; a.prevStatus = a.status; a.status = status; a.endAt = simNow; a.flashUntil = simNow + 1000;
+  };
+  // status-change bookkeeping for the sliding chips (style E): remember the previous column
+  const watchTransitions = () => { for (const a of agents) { if (a._st !== a.status) { a.prevStatus = a._st ?? "spawned"; a._st = a.status; a.movedAt = simNow; } } };
+  const dismissOldestFailed = () => { const i = agents.findIndex(a => a.status === "failed"); if (i >= 0) { agents.splice(i, 1); return true; } return false; };
+  // scripted scenario, loops every 80 s
+  const script = [[0, () => { spawn("agent", 0); }], [3, () => spawn("agent", 1)], [10, () => { const a = agents.find(x => x.label === "explore" && x.status === "running"); if (a) { a.status = "completed"; a.endAt = simNow; a.flashUntil = simNow + 1000; } }], [12, () => { spawn("agent", 2); spawn("agent", 2); }], [18, () => spawn("bg")], [30, () => { const a = agents.find(x => x.kind === "bg" && x.status === "running"); if (a) { a.status = "completed"; a.endAt = simNow; a.flashUntil = simNow + 1000; } }], [40, () => { const a = agents.find(x => x.label === "impl" && x.status === "running"); if (a) { a.status = "failed"; a.endAt = simNow; a.flashUntil = simNow + 1000; } }], [55, () => { const a = agents.find(x => x.label === "review" && x.status === "running"); if (a) { a.status = "completed"; a.endAt = simNow; a.flashUntil = simNow + 1000; } }], [70, () => { for (const a of agents) if (a.status === "running") { a.status = "completed"; a.endAt = simNow; } }]];
+  let scriptIx = 0, loopBase = 0;
+  const tickSim = dt => {
+    simNow += dt;
+    while (scriptIx < script.length && simNow - loopBase >= script[scriptIx][0] * 1000) { script[scriptIx][1](); scriptIx++; }
+    if (simNow - loopBase > 80000) { loopBase = simNow; scriptIx = 0; }
+    // retention: completed vanish after 60 s (SDD §2.6); failed stay
+    for (let i = agents.length - 1; i >= 0; i--) { const a = agents[i]; if (a.status === "completed" && simNow - a.endAt > 60000) agents.splice(i, 1); }
+    watchTransitions();
+    // main loop phases
+    const t = Math.floor(simNow / 2500); turn.phase = PHASES[t % PHASES.length]; if (t % 3 === 0) turn.toolIx = t % TOOLS.length;
+    if (Math.floor(simNow / 45000) !== Math.floor((simNow - dt) / 45000)) turn.startedAt = simNow;
+    // activity samples for style B, one bucket per 6 s
+    if (Math.floor(simNow / 6000) !== Math.floor((simNow - dt) / 6000)) for (const a of agents) a.activity.push(a.status === "running" ? 1 + Math.floor(Math.random() * 6) : 0);
+  };
+
+  // ---------- pure-ish view functions (mirroring DESIGN.md) ----------
+  const elapsed = ms => { const s = Math.max(0, Math.floor(ms / 1000)); if (s < 60) return s + "s"; const m = Math.floor(s / 60); if (m < 10) return m + "m" + String(s % 60).padStart(2, "0"); if (m < 60) return m + "m"; return Math.floor(m / 60) + "h" + String(m % 60).padStart(2, "0"); };
+  const sym = a => a.status === "running" ? SPIN[frame % SPIN.length] : a.status === "completed" ? "✓" : a.status === "failed" ? "✗" : a.status === "killed" ? "⊘" : "○";
+  const cls = a => a.status === "running" ? "g" : (a.status === "failed" || a.status === "killed") ? "r" : "d";
+  const flash = a => simNow < a.flashUntil ? " b" : "";
+  const sorted = () => [...agents].sort((x, y) => (x.status === "running") === (y.status === "running") ? (x.firstAt - y.firstAt || (x.id < y.id ? -1 : 1)) : (x.status === "running" ? -1 : 1));
+  const collapse = list => { const out = []; for (const a of list) { const p = out.find(o => o.label === a.label && o.type === a.type && o.status === a.status && o.kind === a.kind); if (p) { p.n++; p.firstAt = Math.min(p.firstAt, a.firstAt); } else out.push({ ...a, n: 1 }); } return out; };
+  const WIN = 60000;
+  const laneBar = (a, w) => { let s = ""; for (let i = 0; i < w; i++) { const t = simNow - WIN + (i + 1) * (WIN / w); const alive = t >= a.firstAt && (a.endAt == null || t <= a.endAt); s += alive ? (a.endAt != null && i === w - 1 ? "■" : "━") : "·"; } if (a.endAt != null) { const ix = Math.round((a.endAt - (simNow - WIN)) / WIN * w) - 1; if (ix >= 0 && ix < w) s = s.slice(0, ix) + "■" + s.slice(ix + 1); return s; } return s.slice(0, -1) + "▶"; };
+  const actBar = (a, w) => { const buckets = Math.ceil(w / 1); const g = "▁▃▅▇"; let s = ""; const act = a.activity.slice(-Math.ceil(WIN / 6000)); for (let i = 0; i < w; i++) { const t = simNow - WIN + (i + 1) * (WIN / w); const alive = t >= a.firstAt && (a.endAt == null || t <= a.endAt); if (!alive) { s += "·"; continue; } const b = act[Math.floor(i / w * act.length)] ?? 1; s += g[Math.min(3, Math.floor((b - 1) / 1.5))]; } return a.endAt == null ? s.slice(0, -1) + "▶" : s; };
+
+  const title = (rows, cols, viewName, styleC) => {
+    const run = agents.filter(a => a.status === "running").length, done = agents.filter(a => a.status === "completed").length, bad = agents.filter(a => a.status === "failed").length;
+    const summary = ` agents · ${run ? SPIN[frame % SPIN.length] + " " + run + " running" : "· idle"}${done ? " · " + done + " done" : ""}${bad ? " · " + bad + " ✗" : ""} `;
+    const tail = styleC ? "─" : ` ${viewName} ─`;
+    const body = "─" + summary; const fill = Math.max(0, cols - 4 - dw(body) - dw(tail));
+    return `<span class="d">${esc(body)}${"─".repeat(fill)}${esc(tail)}</span><span class="d">    </span>`; // 4 cells reserved for the engine's [-]
+  };
+
+  const mainRowLanes = (cols, styleB) => {
+    const label = pad("main", 10), phase = pad(turn.phase, 10), el = rpad(elapsed(simNow - turn.startedAt), 5);
+    const barW = Math.max(0, cols - 3 - 10 - 10 - 1 - 5 - 1);
+    const bar = "━".repeat(Math.max(0, barW - 1)) + "▶";
+    return `<span class="g">${esc(" · ")}</span><span class="l2">${esc(label)}</span><span class="g">${esc(phase)}</span> <span class="g">${esc(bar)}</span> <span class="d">${esc(el)}</span>`;
+  };
+  const rowLanes = (a, cols, styleB) => {
+    const lbl = pad(fit(a.label + (a.n > 1 ? " ×" + a.n : ""), 10), 10), mdl = pad(a.model, 10), el = rpad(elapsed((a.endAt ?? simNow) - a.firstAt), 5);
+    const barW = Math.max(0, cols - 3 - 10 - 10 - 1 - 5 - 1);
+    const bar = styleB ? actBar(a, barW) : laneBar(a, barW);
+    const lc = styleB ? (a.type === "Explore" || a.type === "haiku" ? "l1" : a.type === "shell" ? "l1" : "l3") : "l2";
+    const c = cls(a);
+    return `<span class="${c}${flash(a)}"> ${esc(sym(a))} </span><span class="${lc}${flash(a)}">${esc(lbl)}</span><span class="d">${esc(mdl)}</span> <span class="${c}">${esc(bar)}</span> <span class="d">${esc(el)}</span>`;
+  };
+  const ruler = cols => { const w = Math.max(0, cols - 3 - 10 - 10 - 1 - 5 - 1); if (w < 20) return null; const inner = "─".repeat(Math.max(0, w - 2)); let s = "└" + inner + "┘"; const put = (ix, t) => { if (ix + t.length < s.length) s = s.slice(0, ix) + t + s.slice(ix + t.length); }; put(1, " -60s "); put(Math.floor(w / 2) - 3, " -30s "); put(w - 6, " now "); return `<span class="d">${esc(" ".repeat(24) + s)}</span>`; };
+
+  const mainRowTree = cols => {
+    const nodes = [["prompt", 0], ["thinking", 1], [TOOLS[turn.toolIx], 2], ["reply", 3]];
+    const cur = turn.phase === "responding" ? 0 : turn.phase === "thinking" ? 1 : turn.phase === "tool-input" || turn.phase === "tool-use" ? 2 : 3;
+    const parts = nodes.map(([n, i]) => { const g = i < cur ? "●" : i === cur ? "◉" : "○"; const c = i === cur ? "g b" : i < cur ? "l2" : "d"; return `<span class="${c}">${esc(g + " " + n)}</span>`; });
+    const plain = nodes.map(([n, i]) => (i < cur ? "●" : i === cur ? "◉" : "○") + " " + n).join(" ─▸ ");
+    const el = rpad(elapsed(simNow - turn.startedAt), 5); const gap = Math.max(1, cols - 8 - dw(plain) - 5 - 1);
+    return ` <span class="l2">main   </span>${parts.join('<span class="d"> ─▸ </span>')}${" ".repeat(gap)}<span class="d">${esc(el)}</span>`;
+  };
+  const rowTree = (a, cols, isLast, styleB) => {
+    const branch = isLast ? " └─ " : " ├─ ";
+    const lbl = pad(fit(a.label + (a.n > 1 ? " ×" + a.n : ""), 12), 12), mdl = pad(a.model, 8);
+    const desc = a.status === "running" ? (a.kind === "bg" ? "make check" : `"${a.label} ticket 0${(a.id.charCodeAt(3) % 7) + 1}"`) : a.status;
+    const el = rpad(elapsed((a.endAt ?? simNow) - a.firstAt), 5);
+    const lc = styleB ? (a.type === "Explore" || a.type === "haiku" || a.type === "shell" ? "l1" : "l3") : "l2";
+    const left = branch + sym(a) + " " + lbl + " " + mdl + " " + desc; const gap = Math.max(1, cols - dw(left) - 5);
+    return `<span class="d">${esc(branch)}</span><span class="${cls(a)}${flash(a)}">${esc(sym(a))} </span><span class="${lc}${flash(a)}">${esc(lbl)}</span> <span class="d">${esc(mdl)}</span> <span class="${a.status === "running" ? "l2" : "d"}">${esc(fit(desc, Math.max(4, cols - dw(branch) - 2 - 13 - 9 - 6)))}</span>${" ".repeat(gap)}<span class="d">${esc(el)}</span>`;
+  };
+
+  // ---------- D: flowchart with light packets on the edges ----------
+  const nodeText = a => `${sym(a)} ${fit(a.label + (a.n > 1 ? " ×" + a.n : ""), 12)}${a.model ? " " + a.model : ""} ${elapsed((a.endAt ?? simNow) - a.firstAt)}`;
+  const renderD = (list, cols, rows) => {
+    const out = [];
+    const mainTxt = `[main ◉ ${turn.phase} ${elapsed(simNow - turn.startedAt)}]`;
+    const left = " " + mainTxt; const lw = dw(left);
+    const edgeW = Math.max(6, Math.min(14, cols - lw - 30));
+    const items = list.slice(0, rows);
+    items.forEach((a, i) => {
+      const first = i === 0, last = i === items.length - 1;
+      const joint = items.length === 1 ? "═" : first ? "╦" : last ? "╚" : "╠";
+      const run = a.status === "running";
+      let edge = (run ? "═" : a.status === "failed" ? "╌" : "═").repeat(edgeW);
+      if (run) { const p = (frame * 2 + i * 5) % edgeW; edge = edge.slice(0, p) + "●" + edge.slice(p + 1); }
+      const node = `[${nodeText(a)}]`;
+      const ec = run ? "g" : a.status === "failed" ? "r" : "d";
+      const pre = first ? `<span class="l2">${esc(left)}</span>` : " ".repeat(lw);
+      const line = `${pre}<span class="${ec}">${esc(joint + edge + "▶")}</span><span class="${cls(a)}${flash(a)}">${esc(fit(node, Math.max(8, cols - lw - edgeW - 2)))}</span>`;
+      out.push(line);
+    });
+    if (!items.length) out.push(`<span class="l2">${esc(left)}</span><span class="d">${esc("═".repeat(edgeW) + "▶ (no agents)")}</span>`);
+    return out;
+  };
+  // ---------- E: three-column state machine with sliding chips ----------
+  const renderE = (list, cols, rows) => {
+    const colW = Math.floor((cols - 2) / 3); const x0 = 1, x1 = 1 + colW, x2 = 1 + 2 * colW;
+    const head = pad(" spawned", colW) + pad("│ running", colW) + pad("│ done / failed", colW);
+    const out = [`<span class="d">${esc(pad(head, cols))}</span>`];
+    const colOf = st => st === "spawned" ? x0 : st === "running" ? x1 : x2;
+    const rowsAvail = rows - 1; const grid = Array.from({ length: rowsAvail }, () => []);
+    const bySt = { spawned: 0, running: 0, done: 0 };
+    list.forEach(a => {
+      const dest = a.status === "running" ? "running" : "done"; const slot = bySt[dest]++; if (slot >= rowsAvail) return;
+      const from = a.prevStatus === "running" ? x1 : a.prevStatus === "spawned" || a.prevStatus == null ? x0 : x2;
+      const t = a.movedAt == null ? 1 : Math.min(1, (simNow - a.movedAt) / 600);
+      const x = Math.round(from + (colOf(dest) - from) * (t < 1 ? t * t * (3 - 2 * t) : 1));
+      const chip = fit(`${sym(a)} ${a.label}${a.n > 1 ? " ×" + a.n : ""}`, colW - 2);
+      grid[slot].push({ x, chip, c: cls(a) + flash(a), moving: t < 1 });
+    });
+    for (const cells of grid) {
+      let line = " ".repeat(cols).split(""); const marks = [];
+      for (const c of cells) { for (let i = 0; i < dw(c.chip); i++) line[c.x + i] = ""; marks.push(c); }
+      let html = ""; let i = 0; let buf = "";
+      const flush = () => { if (buf) { html += `<span class="d">${esc(buf)}</span>`; buf = ""; } };
+      for (i = 0; i < cols; i++) { const m = marks.find(m => m.x === i); if (m) { flush(); html += `<span class="${m.c}${m.moving ? " b" : ""}">${esc(m.chip)}</span>`; i += dw(m.chip) - 1; continue; } buf += (i === x1 || i === x2) ? "│" : " "; }
+      flush(); out.push(html);
+    }
+    return out;
+  };
+  // ---------- F: tracks with a runner per agent ----------
+  const renderF = (list, cols, rows) => {
+    const out = []; const lblW = 12; const trackW = Math.max(10, cols - 1 - lblW - 1 - 6);
+    list.slice(0, rows).forEach(a => {
+      const run = a.status === "running";
+      const speed = 1 + (a.activity.at(-1) ?? 2) * 0.6;
+      const pos = run ? Math.floor(((simNow - a.firstAt) / 1000) * speed) % (trackW - 1) : a.status === "completed" ? trackW - 1 : Math.floor(((a.endAt - a.firstAt) / 1000) * 1.5) % (trackW - 1);
+      let track = "─".repeat(trackW).split("");
+      if (run) { for (let k = 1; k <= 3; k++) if (pos - k >= 0) track[pos - k] = "═"; }
+      const head = run ? "▶" : a.status === "completed" ? "✓" : "✗";
+      track[pos] = ""; // slot for the runner
+      const before = track.slice(0, pos).join(""), after = track.slice(pos + 1).join("");
+      out.push(`<span class="${cls(a)}${flash(a)}"> ${esc(pad(fit(a.label + (a.n > 1 ? " ×" + a.n : ""), lblW), lblW))}</span><span class="d">├${esc(before)}</span><span class="${cls(a)} b">${esc(head)}</span><span class="d">${esc(after)}┤</span><span class="d">${esc(rpad(elapsed((a.endAt ?? simNow) - a.firstAt), 5))}</span>`);
+    });
+    return out;
+  };
+
+  // ---------- G: trace waterfall (turn = trace, agents = spans; left = turn start, right = now) ----------
+  const renderG = (list, cols, rows) => {
+    const out = []; const lblW = 14; const trackW = Math.max(10, cols - 1 - lblW - 1 - 6);
+    const t0 = turn.startedAt, span = Math.max(1000, simNow - t0);
+    const xOf = t => Math.max(0, Math.min(trackW - 1, Math.floor((t - t0) / span * (trackW - 1))));
+    const bar = (a0, a1, running, status) => { let s = ""; for (let i = 0; i < trackW; i++) { if (i < a0 || i > a1) { s += " "; continue; } s += running ? (((i + frame) % 4) === 0 ? "▓" : "▒") : status === "failed" ? "░" : "█"; } return s; };
+    const mainBar = bar(0, trackW - 1, true, "running");
+    out.push(`<span class="l2 b">${esc(pad(" turn", lblW))}</span><span class="d">▕</span><span class="g">${esc(mainBar)}</span><span class="d">▏</span><span class="d">${esc(rpad(elapsed(simNow - t0), 5))}</span>`);
+    list.slice(0, rows - 1).forEach((a, i, arr) => {
+      const run = a.status === "running"; const a0 = xOf(a.firstAt), a1 = xOf(a.endAt ?? simNow);
+      const branch = i === arr.length - 1 ? " └ " : " ├ ";
+      const lbl = pad(fit(sym(a) + " " + a.label + (a.n > 1 ? " ×" + a.n : ""), lblW - 3), lblW - 3);
+      out.push(`<span class="d">${esc(branch)}</span><span class="${cls(a)}${flash(a)}">${esc(lbl)}</span><span class="d">▕</span><span class="${cls(a)}">${esc(bar(a0, a1, run, a.status))}</span><span class="d">▏</span><span class="d">${esc(rpad(elapsed((a.endAt ?? simNow) - a.firstAt), 5))}</span>`);
+    });
+    return out;
+  };
+  // ---------- H: cells + particles + camera (terminal-poster look) ----------
+  let camX = 0;
+  const renderH = (list, cols, rows) => {
+    const CW = 20, GAP = 7; // cell width, edge length between cells
+    const cells = [{ label: "main", sub: turn.phase, status: "running", main: true, flashUntil: 0 }, ...list];
+    const stripW = cells.length * (CW + GAP);
+    const top = [], mid = [], bot = [], edge = [];
+    cells.forEach((c, i) => {
+      const run = c.status === "running", failed = c.status === "failed";
+      const bc = c.main ? "g b" : run ? "g" : failed ? "r" : "d";
+      const title = fit((c.main ? "◉ " : sym(c) + " ") + (c.label + (c.n > 1 ? " ×" + c.n : "")), CW - 4);
+      const sub = fit(c.main ? c.sub + " · " + elapsed(simNow - turn.startedAt) : (c.model ? c.model + " · " : "") + elapsed((c.endAt ?? simNow) - c.firstAt), CW - 4);
+      // a dot orbiting the border = this job's own loop (reference 4); only while running
+      let t = "┌ " + pad(title, CW - 4) + " ┐", b = "└" + "─".repeat(CW - 2) + "┘", lw = "│", rw = "│";
+      if (run && !c.main) { const per = 2 * CW + 2, k = (frame + i * 7) % per; if (k < CW) { if (k === 0 || k === CW - 1 || t[k] === "─" || t[k] === " ") t = t.slice(0, k) + "●" + t.slice(k + 1); } else if (k === CW) rw = "●"; else if (k < 2 * CW + 1) { const j = CW - 1 - (k - CW - 1); b = b.slice(0, j) + "●" + b.slice(j + 1); } else lw = "●"; }
+      top.push(`<span class="${bc}">${esc(t)}</span>`);
+      mid.push(`<span class="${bc}">${esc(lw)}</span><span class="${run || c.main ? "l2" : "d"}${flash(c)}">${esc(" " + pad(sub, CW - 4) + " ")}</span><span class="${bc}">${esc(rw)}</span>`);
+      bot.push(`<span class="${bc}">${esc(b)}</span>`);
+      if (i < cells.length - 1) { const nxt = cells[i + 1]; const nrun = nxt.status === "running"; let e = "─".repeat(GAP - 1) + "▶"; if (nrun) { const p = (frame + i * 3) % (GAP - 1); e = e.slice(0, p) + "◆" + e.slice(p + 1); } edge.push(`<span class="${nrun ? "g" : nxt.status === "failed" ? "r" : "d"}">${esc(e)}</span>`); }
+    });
+    // camera: follow the newest cell that changed (or the last running one)
+    const focus = Math.max(0, cells.findIndex(c => simNow < (c.flashUntil ?? 0)) >= 0 ? cells.findIndex(c => simNow < (c.flashUntil ?? 0)) : cells.map((c, i) => c.status === "running" ? i : -1).filter(i => i >= 0).pop() ?? 0);
+    const target = Math.max(0, Math.min(Math.max(0, stripW - cols), focus * (CW + GAP) - Math.floor(cols / 2) + CW / 2));
+    camX += (target - camX) * 0.12; const off = Math.round(camX);
+    // compose the three strip rows as plain text with span markers, then window them by columns
+    const rowsHtml = [];
+    const build = (parts, edgeParts) => { let html = ""; parts.forEach((p, i) => { html += p; if (edgeParts && i < parts.length - 1) html += edgeParts[i]; else if (!edgeParts && i < parts.length - 1) html += " ".repeat(GAP); }); return html; };
+    const window = html => { // cut by character index, keeping tags intact
+      let out = "", x = 0, inTag = false, ent = "";
+      for (let i = 0; i < html.length; i++) { const ch = html[i]; if (inTag) { out += ch; if (ch === ">") inTag = false; continue; } if (ch === "<") { inTag = true; out += ch; continue; } if (ent) { ent += ch; if (ch === ";") { if (x >= off && x < off + cols) out += ent; x++; ent = ""; } continue; } if (ch === "&") { ent = ch; continue; } if (x >= off && x < off + cols) out += ch; x++; }
+      return out;
+    };
+    rowsHtml.push(window(build(top)));
+    rowsHtml.push(window(build(mid, edge)));
+    rowsHtml.push(window(build(bot)));
+    const hidden = Math.max(0, cells.length - Math.ceil((off + cols) / (CW + GAP)));
+    const leftHidden = Math.floor(off / (CW + GAP));
+    rowsHtml.push(`<span class="d">${esc(pad((leftHidden ? " ◂ " + leftHidden + " more" : "") , cols - 12))}${esc(rpad(hidden ? hidden + " more ▸ " : "", 12))}</span>`);
+    const nodes = [["prompt", 0], ["thinking", 1], [TOOLS[turn.toolIx], 2], ["reply", 3]]; const cur = turn.phase === "responding" ? 0 : turn.phase === "thinking" ? 1 : (turn.phase === "tool-input" || turn.phase === "tool-use") ? 2 : 3;
+    rowsHtml.push(" " + nodes.map(([n, i]) => `<span class="${i === cur ? "g b" : i < cur ? "l2" : "d"}">${esc((i < cur ? "●" : i === cur ? "◉" : "○") + " " + n)}</span>`).join('<span class="d"> ─▸ </span>'));
+    return rowsHtml.slice(0, rows);
+  };
+
+  const render = (style, view, stage, cols) => {
+    const contentRows = stage === "summary" ? 0 : stage === "compact" ? 3 : 6;
+    const lines = [];
+    lines.push(`<span class="d">${esc(pad("telltale · 1 panel", cols - 4))}</span><span class="d">[-]</span>`);
+    lines.push(title(contentRows, cols, view, !"AB".includes(style)));
+    if (contentRows > 0) {
+      let list = sorted(); const budget = style === "C" ? contentRows - 1 : contentRows - 1; // main row (or header) costs one
+      if (list.length > budget) list = collapse(list);
+      let extra = 0; if (list.length > budget) { extra = list.length - budget; list = list.slice(0, budget); }
+      if ("DEFGH".includes(style)) {
+        const full = sorted(); const rowsN = contentRows;
+        const src = full.length > rowsN ? collapse(full) : full;
+        const body = style === "D" ? renderD(src, cols, rowsN) : style === "E" ? renderE(src, cols, rowsN) : style === "F" ? renderF(src, cols, rowsN) : style === "G" ? renderG(src, cols, rowsN) : renderH(src, cols, rowsN);
+        for (const l of body) lines.push(l);
+        extra = 0;
+        const shown = style === "E" ? Math.min(src.length, rowsN - 1) : Math.min(src.length, rowsN);
+        if (src.length > shown && lines.length < 2 + contentRows) lines.push(`<span class="d">${esc(" … +" + (src.length - shown) + " more")}</span>`);
+      } else if (style === "C") {
+        lines.push(`<span class="d">${esc(pad(" ST  TYPE             MODEL   AGE    TOOLS  DESCRIPTION", cols))}</span>`);
+        for (const a of list) { const row = ` ${sym(a)}   ${pad(fit(a.type, 16), 16)} ${pad(a.model, 7)} ${pad(elapsed((a.endAt ?? simNow) - a.firstAt), 6)} ${pad(String(a.activity.reduce((s, x) => s + x, 0)), 6)} ${fit(a.kind === "bg" ? "make check" : a.label + " ticket" + (a.n > 1 ? "  (+" + (a.n - 1) + " same)" : ""), Math.max(4, cols - 44))}`; lines.push(`<span class="${a.status === "running" ? "t " : ""}${cls(a)}${flash(a)}">${esc(pad(row, cols))}</span>`); }
+      } else if (view === "lanes") {
+        lines.push(mainRowLanes(cols, style === "B"));
+        for (const a of list) lines.push(rowLanes(a, cols, style === "B"));
+        if (stage === "full" && lines.length < 2 + contentRows) { const r = ruler(cols); if (r) lines.push(r); }
+      } else {
+        lines.push(mainRowTree(cols));
+        list.forEach((a, i) => lines.push(rowTree(a, cols, i === list.length - 1 && !extra, style === "B")));
+      }
+      if (extra) lines.push(`<span class="d">${esc(" … +" + extra + " more")}</span>`);
+      while (lines.length < 2 + contentRows) lines.push("");
+    }
+    lines.push(`<span class="d">${esc("─".repeat(cols))}</span>`);
+    lines.push(`<span class="prompt">❯ </span>`);
+    return lines.join("\n");
+  };
+
+  // ---------- controls ----------
+  const state = { view: "lanes", stage: "full", cols: 110 };
+  const seg = (id, key, attr) => document.getElementById(id).addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; state[key] = b.dataset[attr]; for (const x of b.parentElement.children) x.setAttribute("aria-pressed", String(x === b)); });
+  seg("view", "view", "v"); seg("stage", "stage", "s");
+  const colsIn = document.getElementById("cols"), colsV = document.getElementById("colsv");
+  colsIn.addEventListener("input", () => { state.cols = +colsIn.value; colsV.textContent = state.cols; });
+  document.getElementById("spawn").addEventListener("click", () => spawn("agent"));
+  document.getElementById("finish").addEventListener("click", () => { if (!dismissOldestFailed()) endOne("completed"); });
+  document.getElementById("fail").addEventListener("click", () => endOne("failed"));
+  document.getElementById("bg").addEventListener("click", () => spawn("bg"));
+  const pauseBtn = document.getElementById("pause");
+  pauseBtn.addEventListener("click", () => { paused = !paused; pauseBtn.textContent = paused ? "繼續" : "暫停"; pauseBtn.setAttribute("aria-pressed", String(paused)); });
+  const chosen = document.getElementById("chosen");
+  for (const r of document.querySelectorAll('input[name="pick"]')) r.addEventListener("change", () => { chosen.hidden = false; chosen.innerHTML = `你選了 <strong>風格 ${r.value}</strong>。回到 Claude Code 回一句 <code>風格 ${r.value}</code> 就行；要混搭（例如 A 的顏色＋C 的欄位）也直接說。`; try { localStorage.setItem("telltale-pick", r.value); } catch (e) {} });
+  try { const p = localStorage.getItem("telltale-pick"); if (p) { const r = document.querySelector(`input[name="pick"][value="${p}"]`); if (r) { r.checked = true; r.dispatchEvent(new Event("change")); } } } catch (e) {}
+
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const A = document.getElementById("termA"), B = document.getElementById("termB"), C = document.getElementById("termC");
+  const D = document.getElementById("termD"), E = document.getElementById("termE"), F = document.getElementById("termF");
+  const G = document.getElementById("termG"), H = document.getElementById("termH");
+  let acc = 0;
+  const loop = now => {
+    const dt = Math.min(200, now - last); last = now;
+    if (!paused) { tickSim(dt); acc += dt; if (acc >= (reduce ? 400 : 80)) { frame++; acc = 0; } }
+    A.innerHTML = render("A", state.view, state.stage, state.cols);
+    B.innerHTML = render("B", state.view, state.stage, state.cols);
+    C.innerHTML = render("C", state.view, state.stage, state.cols);
+    D.innerHTML = render("D", state.view, state.stage, state.cols);
+    E.innerHTML = render("E", state.view, state.stage, state.cols);
+    F.innerHTML = render("F", state.view, state.stage, state.cols);
+    G.innerHTML = render("G", state.view, state.stage, state.cols);
+    H.innerHTML = render("H", state.view, state.stage, state.cols);
+    requestAnimationFrame(loop);
+  };
+  // warm start: a realistic working state, not an empty band
+  simNow = 0; tickSim(0); spawn("agent", 0); agents[0].firstAt = -32000; spawn("agent", 1); agents[1].firstAt = -50000; agents[1].status = "completed"; agents[1].endAt = -14000; spawn("agent", 2); spawn("agent", 2); agents[2].firstAt = agents[3].firstAt = -14000; spawn("bg"); agents[4].firstAt = -5000; turn.startedAt = -64000; scriptIx = script.length; loopBase = -20000;
+  for (const a of agents) { a.flashUntil = 0; for (let i = 0; i < 10; i++) a.activity.push(a.status === "running" ? 1 + Math.floor(Math.random() * 6) : 0); }
+  requestAnimationFrame(loop);
+})();
+</script>
