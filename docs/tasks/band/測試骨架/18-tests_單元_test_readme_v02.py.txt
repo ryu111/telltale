@@ -1,4 +1,6 @@
-"""票 18：README v0.2（validate 區塊、agents 面板說明、TELLTALE_DEV、已知限制）；寬度腳本重跑留痕；CI 不倒退。
+"""票 18：README v0.2。
+
+validate 區塊、agents 面板說明、TELLTALE_DEV、已知限制；寬度腳本重跑留痕；CI 不倒退。
 
 評測法：exact match。對 SDD 切片層 #18、§0.1、§2.5、§2.6、§2.7。
 """
