@@ -107,8 +107,9 @@ test("marquee: text that fits is padded, not scrolled", () => {
 
 test("marquee: text that overflows scrolls with now, same offset within one MARQUEE_STEP_MS window", () => {
   const long = "implement ticket 06 in a worktree";
-  const a = marquee(long, 10, 1000);
-  const b = marquee(long, 10, 1000 + MARQUEE_STEP_MS - 1);
+  const base = 3 * MARQUEE_STEP_MS; // aligned to a step boundary: the window is [base, base + step)
+  const a = marquee(long, 10, base);
+  const b = marquee(long, 10, base + MARQUEE_STEP_MS - 1);
   expect(a).toBe(b);
   expect(displayWidth(a)).toBe(10);
 });
