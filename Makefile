@@ -1,6 +1,6 @@
 # commit 前的閘。門檻是秒數不是工具名：塞不進 10 秒的往 CI 放。
 # 多個 agent 會同時跑這裡：每個 make 最多吃 WORKERS 顆核、nice 讓前景操作優先。各 agent 在自己的 worktree 跑，不共用檔案。
-.PHONY: check ticket tickets
+.PHONY: check mutate ticket tickets
 WORKERS ?= 4
 PY = nice -n 10 uv run
 
@@ -20,3 +20,9 @@ ticket:
 # 一個 feature 的票全部跑完（scripts/跑全部票.py）：依編號與依賴順序，stopped 的記下、依賴它的跳過。長跑用。
 tickets:
 	$(PY) python scripts/跑全部票.py $(F)
+
+# 測試有沒有在測：題目 §5.2 的突變清單（故意改壞一行 → 測試要轉紅）。跑票.py 的第 5 站會叫它。
+# 腳本在 harness 票落地前不存在：這裡故意紅，不假裝過。
+mutate:
+	@test -f scripts/突變.py || { echo "scripts/突變.py 還沒落地（harness 票）：mutate 不能過"; exit 1; }
+	$(PY) python scripts/突變.py
