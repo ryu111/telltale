@@ -27,3 +27,4 @@
 - `avichawla-trace-spans.png`：trace／span 瀑布，span 隨時間填滿（試衣間風格 G）。
 - `de1lymoon-terminal-poster.png`：terminal-poster 風，方框 cell、連線上 ◆ 光點、鏡頭移動（風格 H）。
 - `hanako-loops-vs-graphs.png`：每個 job 自己一個 loop（點繞圈）、splitter→jobs→merge、進度條與 stat tile（H 的邊框繞點）。
+- `beamnxw-cards-pipeline.png`：三張大卡片（每張裡面有自己的清單／內容）、卡片間連線上的方點流動、底部四步 pipeline 目前步驟高亮、iteration 計數跳動、stat tile。＝ H 的 cell 放大版：Pane 高度夠時一個 agent 的 cell 可以列它最近的工具呼叫。
