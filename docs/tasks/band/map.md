@@ -23,7 +23,7 @@
 | 19-plugin-test評估 | 切片 #19；§4 | 手動 `docs/實測/plugin-test.md` | tests/plugin-test/ | — |
 | 20-desc單行 | §2.6a；DESIGN §1；票 17 實測 | `tests/hooks/observe-desc.test.tsx` | observe.ts | 17 |
 
-v0.2 批次（可碰檔案不交集才同批）：B1 {10, 11, 19} → B2 {12, 14} → B3 {13, 15} → B4 {16} → B5 {17} → B6 {18}。
+v0.2 批次（可碰檔案不交集才同批）：B1 {10, 11, 19} → B2 {12, 14} → B3 {13, 15} → B4 {16} → B5 {17} → B6 {18, 20}。2026-09-18 全部 merged。
 v0.2 檢查（出題者對過）：12／13／16／17 的路徑已改成 `plugins/telltale/…` 全路徑（範圍 hook 比對整串）；harness 擴充歸 12；`Panel.stages` 由 11 加欄位；`turn.step` 的 toolUses 在 result；`session.receive` matcher 是物件。
 
 檢查（出題者自己對過）：

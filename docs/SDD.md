@@ -377,7 +377,7 @@ v0.2 追加：fakeEngine 多 `agents: AgentInfo[]`（`$.agent.list` 回它的副
 | I9 | 不 hook `tool.call`／`classic.*`、不宣告 `process.*`／`fs.*`／`http.*`；`hooks.json` 只列一個 module | I1 涵蓋 |
 | I10 | 面板 `view` 拿到 `undefined` 也畫（不空白） | 單元測試 |
 | I11 | 每個寬度 ≥ MIN_COLUMNS 且 maxRows ≥ 4 時，畫面上至少有一行面板內容（擋「全砍掉就不會超寬」） | 切片 8 的腳本每步斷言 |
-| I12（v0.2） | `calls:` 恰好 = 七個 ＋ `$.agent.list` ＋ `$.env.get` ＋ `$.ui.open` ＋ `$.ui.close`（Pane 需要；`$.ui.*` 只畫東西，題目 DoD #1 的字面清單據此擴充，README 要說明）；`hooks:` 恰好 = 第一輪四個 ＋ `turn.start`、`turn.step`、`turn.complete`、`ui.render{component=Spinner}`、`ui.render{component=Pane}`、`session.receive{origin=task-notification}`（十個；恰好的 exact 測試由票 16 收緊，12／13 只驗 ⊆）；仍無 `tool.call`／`classic.*` | I1 的測試改成 v0.2 的兩行 exact；README 區塊同步 |
+| I12（v0.2） | `calls:` 恰好 = 七個 ＋ `$.agent.list` ＋ `$.env.get` ＋ `$.ui.open`（十個；`$.ui.close` 預留但 v0.2 沒用到，validate 不會列；Pane 需要 open；`$.ui.*` 只畫東西，題目 DoD #1 的字面清單據此擴充，README 要說明）；`hooks:` 恰好 = 第一輪四個 ＋ `turn.start`、`turn.step`、`turn.complete`、`ui.render{component=Spinner}`、`ui.render{component=Pane}`、`session.receive{origin=task-notification}`（十個；恰好的 exact 測試由票 16 收緊，12／13 只驗 ⊆）；仍無 `tool.call`／`classic.*` | I1 的測試改成 v0.2 的兩行 exact；README 區塊同步 |
 | I13（v0.2） | 每個 hook 都 `return next(e)`（觀察型 hook 不改任何事件的結果），且每種事件對 `agents.cells` 的寫入內容正確 | 流程測試：每種事件打進去，`next` 恰好一次且回傳 === next 的回傳，**並斷言寫進 store 的 cell 內容**（節點名、t0、desc）；突變：拿掉一個 `return next(e)`、把節點名寫死 |
 | I14（v0.2） | `renderCell` 輸出的每一列 `displayWidth ≤ w`，任何 `now`／`frame`／`cam`／style／cell 組合 | 單元＋property 測試（含 w 20、任務名稱全中文、64 步）；突變：elapsed 不裁 |
 | I15（v0.2） | 排序穩定：同一組 cells 任何順序輸入，`sortCells` 輸出相同；running 在前，其後依 firstAt，再依 id | property 測試（隨機打亂 50 次，含同 firstAt 的案例） |
