@@ -21,6 +21,7 @@
 | 17-agents指令與點擊 | 切片 #17；§1.6 v0.2；§2.6 onRow | `tests/hooks/agents-command.test.ts` | command.ts、panels/agents.ts、panel.ts、register.tsx | 13、16 |
 | 18-發佈v0.2 | 切片 #18；§2.5 | `tests/單元/test_readme_v02.py`＋寬度腳本 | README×2、docs/實測/寬度.md | 16、17 |
 | 19-plugin-test評估 | 切片 #19；§4 | 手動 `docs/實測/plugin-test.md` | tests/plugin-test/ | — |
+| 20-desc單行 | §2.6a；DESIGN §1；票 17 實測 | `tests/hooks/observe-desc.test.tsx` | observe.ts | 17 |
 
 v0.2 批次（可碰檔案不交集才同批）：B1 {10, 11, 19} → B2 {12, 14} → B3 {13, 15} → B4 {16} → B5 {17} → B6 {18}。
 v0.2 檢查（出題者對過）：12／13／16／17 的路徑已改成 `plugins/telltale/…` 全路徑（範圍 hook 比對整串）；harness 擴充歸 12；`Panel.stages` 由 11 加欄位；`turn.step` 的 toolUses 在 result；`session.receive` matcher 是物件。
