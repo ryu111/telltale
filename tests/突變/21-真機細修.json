@@ -1,0 +1,20 @@
+[
+  {
+    "label": "session.start keeps stale cells",
+    "file": "plugins/telltale/hooks/register.tsx",
+    "old": "    await $.store.set(\"agents.cells\", {});",
+    "new": ""
+  },
+  {
+    "label": "descOfTurn: tag with attributes ignored",
+    "file": "plugins/telltale/hooks/observe.ts",
+    "old": "const NOTIFICATION_TAG_RE = /^<([a-zA-Z-]+)[\\s>]/;",
+    "new": "const NOTIFICATION_TAG_RE = /^<([a-zA-Z-]+)>/;"
+  },
+  {
+    "label": "agents default stage compact",
+    "file": "plugins/telltale/hooks/panels/agents.ts",
+    "old": "  defaultStage: \"full\",",
+    "new": "  defaultStage: \"compact\","
+  }
+]

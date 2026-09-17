@@ -12,7 +12,7 @@ export type AgentsView = {
 };
 
 export type TelltaleState = {
-  order: { id: string; label: string; stages?: boolean }[];
+  order: { id: string; label: string; stages?: boolean; defaultStage?: Stage }[];
   panels: Record<string, boolean>;
   sizes: Record<string, Stage>;
   layout: { slots: { id: string; rows: number }[]; dropped: string[]; total: number };
@@ -97,14 +97,14 @@ const toggleOne = (id: string, state: TelltaleState): TelltaleResult => {
 const sizeStatus = (id: string, state: TelltaleState): TelltaleResult => {
   const panel = state.order.find((p) => p.id === id);
   if (!panel?.stages) return usage(state);
-  const current = state.sizes[id] ?? "compact";
+  const current = state.sizes[id] ?? panel.defaultStage ?? "compact";
   return { text: `${id}: size ${current}`, panels: state.panels, sizes: state.sizes };
 };
 
 const sizeSet = (id: string, to: Stage, state: TelltaleState): TelltaleResult => {
   const panel = state.order.find((p) => p.id === id);
   if (!panel?.stages) return usage(state);
-  const from = state.sizes[id] ?? "compact";
+  const from = state.sizes[id] ?? panel.defaultStage ?? "compact";
   if (from === to) return { text: `${id}: size ${from} (unchanged)`, panels: state.panels, sizes: state.sizes };
   return { text: `${id}: size ${from} → ${to}`, panels: state.panels, sizes: { ...state.sizes, [id]: to } };
 };

@@ -442,6 +442,11 @@ export const renderStrip = (cell: Cell, h: number): CellLine[] => {
   return out.slice(0, h).map((line, i) => ({ spans: [{ text: pad(line, STRIP_W), tone: tones[i]! }] }));
 };
 
+// Ticket 21 (SDD §2.6 main 歷史合併): the merged history cell's fixed id.
+// Lives here (not panels/agents.ts) so renderCell below can special-case it
+// without a panel import; panels/agents.ts re-exports it.
+export const MAIN_HISTORY_ID = "main-history";
+
 /** Independent of `renderCell`: main history's merged row (DESIGN §2.6260 "main 歷史合併"). Always a completed-looking row. */
 export const renderMainHistory = (count: number, recentDesc: string, w: number): CellLine => {
   const prefix = `✓ ${count} turns · `;
@@ -509,6 +514,11 @@ export const renderCell = (
   frame: number,
   cam: CameraState,
 ): { lines: CellLine[]; cam: CameraState } => {
+  // Ticket 21: the merged history cell is never a node chain, in any style.
+  if (cell.id === MAIN_HISTORY_ID) {
+    const count = cell.steps.filter((s) => s.name === "turn").length;
+    return { lines: [renderMainHistory(count, cell.desc, w)], cam };
+  }
   if (style === "v1") {
     const stripW = cell.steps.length * NODE_W + Math.max(0, cell.steps.length - 1) * EDGE_W;
     const offset = easeCamera(cam.offset, cameraTarget(stripW, w));

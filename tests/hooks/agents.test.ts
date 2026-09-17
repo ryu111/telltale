@@ -60,9 +60,11 @@ test("a new AgentInfo opens a running sub cell; status flip to completed pushes 
 });
 
 test("a sub cell already opened by turn.step (desc \"\") is filled in by the next poll, not duplicated", async () => {
-  const eng = fakeEngine({ now: 0, store: { "agents.cells": { a1: { id: "a1", kind: "sub", label: "sub", desc: "", status: "running", firstAt: 0, updatedAt: 0, steps: [{ name: "prompt", t0: 0 }] } } } });
+  const eng = fakeEngine({ now: 0 });
   register(eng.on, {});
   await eng.fire("session.start", {});
+  // Seeded AFTER session.start: ticket 21 clears `agents.cells` at session start.
+  eng.store["agents.cells"] = { a1: { id: "a1", kind: "sub", label: "sub", desc: "", status: "running", firstAt: 0, updatedAt: 0, steps: [{ name: "prompt", t0: 0 }] } };
   eng.agents = [{ id: "a1", description: "explore src", type: "Explore", status: "running" }];
   await eng.tick("agents");
   const cells = eng.store["agents.cells"] as Cells;
@@ -71,17 +73,14 @@ test("a sub cell already opened by turn.step (desc \"\") is filled in by the nex
 });
 
 test("completed cells vanish 60s after endAt but not one tick before; failed cells never auto-vanish (I16)", async () => {
-  const eng = fakeEngine({
-    now: 60_000,
-    store: {
-      "agents.cells": {
-        done: { id: "done", kind: "sub", label: "sub", desc: "x", status: "completed", firstAt: 0, endAt: 1000, updatedAt: 1000, steps: [] },
-        failed: { id: "failed", kind: "sub", label: "sub", desc: "y", status: "failed", firstAt: 0, endAt: 1000, updatedAt: 1000, steps: [] },
-      },
-    },
-  });
+  const eng = fakeEngine({ now: 60_000 });
   register(eng.on, {});
   await eng.fire("session.start", {});
+  // Seeded AFTER session.start: ticket 21 clears `agents.cells` at session start.
+  eng.store["agents.cells"] = {
+    done: { id: "done", kind: "sub", label: "sub", desc: "x", status: "completed", firstAt: 0, endAt: 1000, updatedAt: 1000, steps: [] },
+    failed: { id: "failed", kind: "sub", label: "sub", desc: "y", status: "failed", firstAt: 0, endAt: 1000, updatedAt: 1000, steps: [] },
+  };
   eng.agents = [];
   eng.now = 1000 + 59_000; // 59s after endAt
   await eng.tick("agents");
@@ -146,16 +145,13 @@ test("model pairing property: N>=3 same-description pending spawns each attach a
 // ── main history fold ──
 
 test("a completed main cell folds into the reserved history cell 3s after it completes, and stays there past 60s (§2.6 main history)", async () => {
-  const eng = fakeEngine({
-    now: 0,
-    store: {
-      "agents.cells": {
-        t1: { id: "t1", kind: "main", label: "main", desc: "did a thing", status: "completed", firstAt: 0, endAt: 1000, updatedAt: 1000, steps: [{ name: "prompt", t0: 0 }, { name: "reply", t0: 1000 }] },
-      },
-    },
-  });
+  const eng = fakeEngine({ now: 0 });
   register(eng.on, {});
   await eng.fire("session.start", {});
+  // Seeded AFTER session.start: ticket 21 clears `agents.cells` at session start.
+  eng.store["agents.cells"] = {
+    t1: { id: "t1", kind: "main", label: "main", desc: "did a thing", status: "completed", firstAt: 0, endAt: 1000, updatedAt: 1000, steps: [{ name: "prompt", t0: 0 }, { name: "reply", t0: 1000 }] },
+  };
   eng.agents = [];
 
   eng.now = 1000 + 2_999; // just under 3s
@@ -177,16 +173,13 @@ test("a completed main cell folds into the reserved history cell 3s after it com
 });
 
 test("a running main cell is never folded into history", async () => {
-  const eng = fakeEngine({
-    now: 100_000,
-    store: {
-      "agents.cells": {
-        t1: { id: "t1", kind: "main", label: "main", desc: "still going", status: "running", firstAt: 0, updatedAt: 0, steps: [{ name: "prompt", t0: 0 }] },
-      },
-    },
-  });
+  const eng = fakeEngine({ now: 100_000 });
   register(eng.on, {});
   await eng.fire("session.start", {});
+  // Seeded AFTER session.start: ticket 21 clears `agents.cells` at session start.
+  eng.store["agents.cells"] = {
+    t1: { id: "t1", kind: "main", label: "main", desc: "still going", status: "running", firstAt: 0, updatedAt: 0, steps: [{ name: "prompt", t0: 0 }] },
+  };
   eng.agents = [];
   await eng.tick("agents");
   const cells = eng.store["agents.cells"] as Cells;

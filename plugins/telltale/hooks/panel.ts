@@ -1,7 +1,7 @@
 // Panel contract types. SDD §1.1, §1.1a.
 // Pure data + types only. No `claude-code` import, no `$`.
 
-import type { Stages } from "./layout";
+import type { Stage, Stages } from "./layout";
 import type { PendingSpawn } from "./observe";
 import type { Cell } from "./cells";
 
@@ -61,6 +61,7 @@ export type Panel<D = unknown> = {
   everyMs?: number; // present only when poll is present; >= 1000
   needsAgents?: boolean; // ticket 13: framework injects io.agents/cells/takePending only when true
   stages?: Stages; // v0.2, SDD §1.2 rule 8
+  defaultStage?: Stage; // ticket 21: initial `size.<id>` when nothing's been stored yet (default "compact")
   poll?: (io: PanelIo) => Promise<D>; // return value round-trips through JSON into $.store
   view: (data: D | undefined, columns: number, rows: number) => PanelView; // pure function
 };
