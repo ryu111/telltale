@@ -4,10 +4,11 @@
 // $.agent.list, $.env.get.
 
 import type { On, PluginOptions, Register } from "claude-code";
-import { runTelltale, type TelltaleState } from "./command";
+import { runTelltale, type AgentsView, type TelltaleState } from "./command";
 import { BAND_ROWS_MAX, layout, MIN_COLUMNS, nextStage, rowsForStage, type Stage, type Stages } from "./layout";
 import type { BandPanel, BandProps } from "./hit";
 import type { Panel } from "./panel";
+import { onRow } from "./panels/agents";
 import {
   applySpinner,
   applyTaskNotification,
@@ -27,6 +28,7 @@ const DATA_MAX_BYTES = 64 * 1024;
 
 type ToggleMessage = { kind: "toggle"; id: string };
 type StageMessage = { kind: "stage"; id: string };
+type RowMessage = { kind: "row"; id: string; hit: string };
 
 const isToggle = (data: unknown): data is ToggleMessage =>
   typeof data === "object" &&
@@ -39,6 +41,13 @@ const isStageMessage = (data: unknown): data is StageMessage =>
   data !== null &&
   (data as { kind?: unknown }).kind === "stage" &&
   typeof (data as { id?: unknown }).id === "string";
+
+const isRowMessage = (data: unknown): data is RowMessage =>
+  typeof data === "object" &&
+  data !== null &&
+  (data as { kind?: unknown }).kind === "row" &&
+  typeof (data as { id?: unknown }).id === "string" &&
+  typeof (data as { hit?: unknown }).hit === "string";
 
 const stagesOf = (p: Panel): Stages | undefined => p.stages;
 
@@ -76,9 +85,31 @@ async function buildBandProps(active: readonly Panel[], $: any, maxRows: number,
   const bandPanels = await Promise.all(
     slots.map(async (slot) => {
       const p = byId.get(slot.id)!;
-      const cached = (await $.store.get(`data.${p.id}`)) as { at: number; data: unknown } | undefined;
       const error = ((await $.store.get(`error.${p.id}`)) as string | undefined) ?? "";
-      const view = p.view(cached?.data, columnsForView, slot.rows);
+
+      // Ticket 17 (票 16 遺留接線 item 2): the agents panel's poll result
+      // lives at the `agents.cells` key, not `data.agents` like every other
+      // panel (register.tsx's own tick loop writes it there — see below) —
+      // so its `view()` is fed straight from that key instead of the
+      // shared `data.<id>` cache.
+      if (p.id === "agents") {
+        const cells = ((await $.store.get("agents.cells")) as Record<string, import("./cells").Cell> | undefined) ?? {};
+        const style = ((await $.store.get("style.agents")) as "v1" | "v2" | "v4" | undefined) ?? "v1";
+        const view = p.view(cells, columnsForView, slot.rows) as { kind?: string; cells?: unknown };
+        return {
+          id: p.id,
+          label: p.label,
+          rows: slot.rows,
+          lines: [],
+          ...(view.kind === "cells" ? { cells: view.cells, style } : {}),
+          at: null,
+          error: error === "" ? null : error,
+          stages: Boolean(stagesOf(p)),
+        } as unknown as BandPanel;
+      }
+
+      const cached = (await $.store.get(`data.${p.id}`)) as { at: number; data: unknown } | undefined;
+      const view = p.view(cached?.data, columnsForView, slot.rows) as { lines: BandPanel["lines"] };
       return {
         id: p.id,
         label: p.label,
@@ -259,6 +290,16 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
         await $.store.set(`size.${data.id}`, toStage);
         $.ui.invalidate("ui.render");
       }
+    } else if (isRowMessage(data) && data.id === "agents") {
+      // Ticket 17 (SDD §2.6 "onRow"): a cell click, dispatched to the
+      // agents panel's own pure `onRow` — this hook only reads/writes the
+      // store keys it touches.
+      const cells = ((await $.store.get("agents.cells")) as Cells | undefined) ?? {};
+      const now = await $.clock.now();
+      const { cells: updated, expanded } = onRow(data.hit, cells, now);
+      await $.store.set("agents.cells", updated);
+      await $.store.set("agents.expanded", expanded);
+      $.ui.invalidate("ui.render");
     }
     return next(e);
   });
@@ -279,18 +320,34 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
           .map(async (p) => [p.id, ((await $.store.get(`size.${p.id}`)) as Stage | undefined) ?? "compact"] as const),
       ),
     );
+    // Ticket 17: `agents *` sub-commands need the panel's own current
+    // style/edge/size/cells — only fetched when the panel is actually
+    // registered (SDD §1.6 v0.2 table).
+    const agentsView: AgentsView | undefined = active.some((p) => p.id === "agents")
+      ? {
+          style: ((await $.store.get("style.agents")) as AgentsView["style"] | undefined) ?? "v2",
+          edge: ((await $.store.get("edge.agents")) as AgentsView["edge"] | undefined) ?? "right",
+          size: ((await $.store.get("size.agents")) as AgentsView["size"] | undefined) ?? "compact",
+          cells: ((await $.store.get("agents.cells")) as Cells | undefined) ?? {},
+        }
+      : undefined;
+
     const state: TelltaleState = {
       order: active.map((p) => ({ id: p.id, label: p.label, stages: Boolean(stagesOf(p)) })),
       panels: panelsState,
       sizes,
       layout: { slots, dropped, total },
       available: BAND_ROWS_MAX,
+      agentsView,
     };
 
     const result = runTelltale((e as { args?: string }).args ?? "", state);
+    // A single invalidate for however many of panels/sizes/writes actually
+    // changed (ticket 17: don't invalidate twice just because two of them did).
+    let changed = false;
     if (result.panels !== state.panels) {
       await $.store.set("panels", result.panels);
-      $.ui.invalidate("ui.render");
+      changed = true;
     }
     if (result.sizes !== state.sizes) {
       for (const [id, stage] of Object.entries(result.sizes)) {
@@ -298,8 +355,15 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
           await $.store.set(`size.${id}`, stage);
         }
       }
-      $.ui.invalidate("ui.render");
+      changed = true;
     }
+    if (result.writes) {
+      for (const [key, value] of Object.entries(result.writes)) {
+        await $.store.set(key, value);
+      }
+      changed = true;
+    }
+    if (changed) $.ui.invalidate("ui.render");
     return { text: result.text };
   });
 

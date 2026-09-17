@@ -2,6 +2,14 @@
 // Pure function only — no `claude-code` import, no `$`.
 
 import { STAGE_ORDER, type Stage } from "./layout";
+import type { Cell } from "./cells";
+
+export type AgentsView = {
+  style: "v1" | "v2" | "v4";
+  edge: "right" | "bottom";
+  size: "summary" | "compact" | "full";
+  cells: Record<string, Cell>;
+};
 
 export type TelltaleState = {
   order: { id: string; label: string; stages?: boolean }[];
@@ -9,9 +17,17 @@ export type TelltaleState = {
   sizes: Record<string, Stage>;
   layout: { slots: { id: string; rows: number }[]; dropped: string[]; total: number };
   available: number;
+  agentsView?: AgentsView; // ticket 17, SDD §1.6 v0.2 table
 };
 
-export type TelltaleResult = { text: string; panels: Record<string, boolean>; sizes: Record<string, Stage> };
+export type TelltaleResult = {
+  text: string;
+  panels: Record<string, boolean>;
+  sizes: Record<string, Stage>;
+  // Ticket 17: store keys `/telltale agents *` wrote (style.agents/edge.agents/
+  // size.agents/agents.cells). Omitted entirely (not `{}`) when nothing changed.
+  writes?: Record<string, unknown>;
+};
 
 // Keywords that never double as a panel id (SDD §1.6 table); a second token
 // after one of these is always malformed, never "unknown panel <keyword>".
@@ -93,11 +109,77 @@ const sizeSet = (id: string, to: Stage, state: TelltaleState): TelltaleResult =>
   return { text: `${id}: size ${from} → ${to}`, panels: state.panels, sizes: { ...state.sizes, [id]: to } };
 };
 
+// SDD §1.6 v0.2 table. `agents style|edge|size` report or set one of the
+// three `*.agents` store keys; `agents clear` drops dismissable cells.
+const AGENTS_STYLES = ["v1", "v2", "v4"] as const;
+const AGENTS_SIZES = ["summary", "compact", "full"] as const;
+const CLEARABLE = new Set(["failed", "killed", "orphan"]);
+
+const agentsSet = (key: string, label: string, from: string, to: string, state: TelltaleState): TelltaleResult => {
+  if (from === to) return { text: `agents ${label}: ${from} (unchanged)`, panels: state.panels, sizes: state.sizes };
+  return { text: `agents ${label}: ${from} → ${to}`, panels: state.panels, sizes: state.sizes, writes: { [key]: to } };
+};
+
+const agentsClear = (cells: Record<string, Cell>, state: TelltaleState): TelltaleResult => {
+  const kept = Object.fromEntries(Object.entries(cells).filter(([, c]) => !CLEARABLE.has(c.status)));
+  const removed = Object.keys(cells).length - Object.keys(kept).length;
+  const text = `agents: cleared ${removed}`;
+  if (removed === 0) return { text, panels: state.panels, sizes: state.sizes };
+  return { text, panels: state.panels, sizes: state.sizes, writes: { "agents.cells": kept } };
+};
+
+const agentsCommand = (tokens: readonly string[], state: TelltaleState): TelltaleResult => {
+  const view = state.agentsView;
+  if (!view) return unknownPanel("agents", state);
+
+  const sub = tokens[1];
+  const value = tokens[2];
+
+  if (sub === "style") {
+    if (tokens.length === 2) return { text: `agents style: ${view.style}`, panels: state.panels, sizes: state.sizes };
+    if (tokens.length === 3 && value !== undefined && (AGENTS_STYLES as readonly string[]).includes(value)) {
+      return agentsSet("style.agents", "style", view.style, value, state);
+    }
+    return usage(state);
+  }
+
+  if (sub === "edge") {
+    if (tokens.length === 2) return { text: `agents edge: ${view.edge}`, panels: state.panels, sizes: state.sizes };
+    if (tokens.length === 3 && (value === "right" || value === "bottom")) {
+      return agentsSet("edge.agents", "edge", view.edge, value, state);
+    }
+    if (tokens.length === 3 && (value === "top" || value === "left")) {
+      return { text: `agents edge ${value}: not available in this build`, panels: state.panels, sizes: state.sizes };
+    }
+    return usage(state);
+  }
+
+  if (sub === "size") {
+    if (tokens.length === 2) return { text: `agents size: ${view.size}`, panels: state.panels, sizes: state.sizes };
+    if (tokens.length === 3 && value !== undefined && (AGENTS_SIZES as readonly string[]).includes(value)) {
+      return agentsSet("size.agents", "size", view.size, value, state);
+    }
+    return usage(state);
+  }
+
+  if (sub === "clear" && tokens.length === 2) return agentsClear(view.cells, state);
+
+  return usage(state);
+};
+
 export const runTelltale = (args: string, state: TelltaleState): TelltaleResult => {
   const tokens = args.split(/\s+/).filter((t) => t.length > 0);
   const known = new Set(state.order.map((p) => p.id));
 
   if (tokens.length === 0) return { text: statusText(state), panels: state.panels, sizes: state.sizes };
+
+  // Ticket 17: `agents` sub-commands (style/edge/size/clear) — a second-level
+  // sub-command, not a v0.1 reserved word, so a missing `agents` panel falls
+  // to the ordinary "unknown panel" path rather than a special-cased message.
+  if (tokens[0] === "agents") {
+    if (!known.has("agents")) return unknownPanel("agents", state);
+    return agentsCommand(tokens, state);
+  }
 
   if (tokens.length === 1) {
     const [t0] = tokens as [string];

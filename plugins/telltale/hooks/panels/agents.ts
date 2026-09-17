@@ -5,7 +5,6 @@ import { CONTENT_ROWS_MAX } from "../layout";
 import type { Panel } from "../panel";
 import { compressSteps, VANISH_AFTER_MS, COLLAPSE_AFTER_MS, ORPHAN_MS, type Cell, type Step } from "../cells";
 import type { PendingSpawn } from "../observe";
-import { fit } from "../width";
 
 export const MAIN_HISTORY_ID = "main-history";
 
@@ -161,13 +160,37 @@ export const agents: Panel<Cells> = {
 
     return cells;
   },
-  // Ticket 13 scope is poll only. Rendering `cells` into the box/strip
-  // layouts (the renderCell/sortCells wiring from ticket 14) is ticket
-  // 15/16's job — this view is a minimal placeholder (a cell count) that
-  // satisfies the existing `Panel<D>` contract without pretending to draw
-  // the real band yet.
-  view: (cells, columns, _rows) => {
-    const count = Object.keys(cells ?? {}).length;
-    return { id: "agents", lines: [{ text: fit(`agents · ${count} cell${count === 1 ? "" : "s"}`, columns), tone: "dim" }] };
-  },
+  // Ticket 17: hands the raw cells to the drawing thread's `renderCell`
+  // (SDD §1.1a) instead of pre-formatting a text line — `style` is a
+  // `$.store` concern (`style.agents`), so `register.tsx` attaches it, not
+  // this pure function.
+  view: (cells, _columns, _rows) => ({ id: "agents", kind: "cells", cells: Object.values(cells ?? {}) }),
 };
+
+// ── Ticket 17: onRow / isExpanded (SDD §2.6 "onRow") ──
+
+export type OnRowResult = { cells: Cells; expanded: { id: string; at: number } | null };
+
+// Click-to-expand window: past this age, the Client treats `expanded` as
+// stale on its own (no `$.clock.every` needed just to null it back out).
+export const EXPANDED_MS = 10_000;
+
+export const onRow = (hit: string, cells: Cells, now: number): OnRowResult => {
+  const cell = cells[hit];
+  if (!cell) return { cells, expanded: null };
+
+  if (cell.status === "failed" || cell.status === "killed" || cell.status === "orphan") {
+    return { cells: { ...cells, [hit]: { ...cell, dismissed: true } }, expanded: null };
+  }
+
+  if (cell.status === "completed") return { cells, expanded: { id: hit, at: now } };
+
+  if (cell.status === "running") {
+    return { cells: { ...cells, [hit]: { ...cell, collapsed: !cell.collapsed } }, expanded: null };
+  }
+
+  return { cells, expanded: null };
+};
+
+export const isExpanded = (expanded: { id: string; at: number } | null, now: number): boolean =>
+  expanded !== null && now - expanded.at < EXPANDED_MS;
