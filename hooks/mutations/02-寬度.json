@@ -1,0 +1,20 @@
+[
+  {
+    "label": "width: wide chars count 1",
+    "file": "hooks/width.ts",
+    "old": "return isWide(codePoint) ? 2 : 1;",
+    "new": "return isWide(codePoint) ? 1 : 1;"
+  },
+  {
+    "label": "width: fit truncates a string that already fits",
+    "file": "hooks/width.ts",
+    "old": "if (displayWidth(s) <= columns) return s;",
+    "new": "if (false) return s;"
+  },
+  {
+    "label": "width: fit cuts one column too many",
+    "file": "hooks/width.ts",
+    "old": "const budget = columns - 1; // reserve 1 column for the ellipsis",
+    "new": "const budget = columns - 2; // reserve 1 column for the ellipsis"
+  }
+]
