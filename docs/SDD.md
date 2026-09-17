@@ -7,7 +7,7 @@
 
 | 題目說 | 型別檔／實測說 | 本檔的決定 |
 |---|---|---|
-| `claude plugin test <dir>` 全過 | 子指令不存在（帶旗標也沒有；npm latest 2.1.274 的 changelog 也沒提） | DoD #2 改成 `bun test hooks/` 連跑兩次 0 fail，harness 自建（§4） |
+| `claude plugin test <dir>` 全過 | 子指令不存在（帶旗標也沒有；npm latest 2.1.274 的 changelog 也沒提） | DoD #2 改成 `bun test plugins/telltale/hooks/` 連跑兩次 0 fail，harness 自建（§4） |
 | 一律用 `e.props.bodyColumns` | `AbovePrompt` 的 props 只有 `hasSurvey`、`isWorking`、`maxRows`、`scroll`；`bodyColumns` 是 `Pane` 的 | 寬度由 `Client` 的 `surface.columns` 決定（region 實際排版後的欄數，resize 會再呼叫一次）；hooks module 只算高度、不算寬度（§1.5） |
 | `Client module="./chart.tsx"` 字面值路徑 | `hooks.json` 多一個 `"surface": "band.tsx"`（相對 hooks.json 的單一路徑），`Client` 的 `module` 是那個檔的**export 名** | `hooks.json = { modules: ["register.tsx"], surface: "band.tsx" }`，`<Client key="band" module="Band" props={…} />`（`key` 是樹上的位址、`module` 是 export 名，兩個字串刻意不同） |
 | `ClientElements` 少 `Raster` | `Omit<Elements['terminal'], 'Client'>`；整份型別檔沒有 `Raster` | 不提 Raster |
@@ -193,7 +193,8 @@ export function Band(props: BandProps, surface: ClientSurface<BandState>): Rende
 
 #### 2.5 安裝、開發、卸載（README 要寫的）
 
-- 開發：`--plugin-dir`；正式：`claude plugin install`（marketplace）或放 `~/.claude/skills/telltale/`。同名時 `--plugin-dir` 優先。
+- 目錄（2026-09-17 使用者裁定「專案結構跟 plugin 結構要拆開」）：repo 根是 marketplace（`.claude-plugin/marketplace.json`，`source: ./plugins/telltale`）＋開發工具；plugin 本體整個在 `plugins/telltale/`（`.claude-plugin/plugin.json`、`hooks/`、README、LICENSE）。本文件所有 `hooks/…` 路徑相對 `plugins/telltale/`；突變清單在 `tests/突變/`。
+- 開發：`--plugin-dir <repo>/plugins/telltale`；正式：`claude plugin marketplace add ryu111/telltale` → `claude plugin install telltale@telltale`；或放 `~/.claude/skills/telltale/`。同名時 `--plugin-dir` 優先。
 - 卸載：`claude plugin uninstall telltale` 刪 `${CLAUDE_PLUGIN_DATA}`，但 **`$.store` 的檔（`~/.claude/plugins/store/`）官方文件沒說會刪**——README 寫清楚檔案位置與一行清除指令。plugin 自己不做「卸載時清 store」（沒有這種事件）。
 
 ### 3. Pipeline（產品的執行流程）

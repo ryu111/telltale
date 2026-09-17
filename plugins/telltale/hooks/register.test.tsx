@@ -211,7 +211,9 @@ test("I1: every allowed op is exercised at least once across start + tick + rend
 });
 
 test("I1: claude plugin validate --strict reports exactly the seven allowed calls", () => {
-  const r = Bun.spawnSync(["claude", "plugin", "validate", "--strict", "--json", "."], {
+  // The plugin root is this file's parent directory, wherever the repo is checked out.
+  const pluginDir = new URL("..", import.meta.url).pathname;
+  const r = Bun.spawnSync(["claude", "plugin", "validate", "--strict", "--json", pluginDir], {
     env: { ...process.env, CLAUDE_CODE_ENABLE_FUNCTION_HOOKS: "1" },
   });
   const report = JSON.parse(r.stdout.toString()) as { success: boolean; contents: { type: string; notes: string[] }[] };

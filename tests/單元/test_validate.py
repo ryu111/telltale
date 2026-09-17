@@ -9,6 +9,7 @@ import subprocess
 from pathlib import Path
 
 根 = Path(__file__).resolve().parents[2]
+插件 = 根 / "plugins/telltale"
 白名單 = {
     "$.ui.resolve",
     "$.ui.invalidate",
@@ -22,7 +23,7 @@ from pathlib import Path
 
 def _validate() -> tuple[int, dict]:  # type: ignore[type-arg]
     r = subprocess.run(
-        ["claude", "plugin", "validate", "--strict", "--json", str(根)],
+        ["claude", "plugin", "validate", "--strict", "--json", str(插件)],
         capture_output=True,
         text=True,
         check=False,

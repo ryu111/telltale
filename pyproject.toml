@@ -3,7 +3,7 @@ name = "telltale"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = []
-# The plugin itself is TypeScript under hooks/ and ships with no Python.
+# The plugin itself is TypeScript under plugins/telltale/hooks/ and ships with no Python.
 # This file only pins the dev tooling for the ticket runner in scripts/.
 
 [dependency-groups]
@@ -23,7 +23,7 @@ timeout = 300  # pytest-timeout：一支測試卡住不能卡死整條 check 與
 [tool.ruff]
 line-length = 100
 src = ["scripts", "tests"]
-extend-exclude = ["docs", "hooks", "node_modules"]
+extend-exclude = ["docs", "plugins", "node_modules"]
 
 [tool.ruff.lint]
 # KISS／SRP／YAGNI 能機械化的部分：複雜度、參數數量、分支數、死程式碼、未用參數。

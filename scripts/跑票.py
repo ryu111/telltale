@@ -33,7 +33,8 @@ from typing import Any
 執行器型 = Callable[[Sequence[str], Path | None], tuple[int, str, str]]
 結構目錄 = Path(__file__).resolve().parent / "schema"
 另一家 = {"codex": "agy", "agy": "codex"}
-_check涵蓋 = ("tests/單元", "tests/流程", "hooks/")  # make check 已跑這些目錄，驗收站不重跑
+# make check 已跑這些目錄，驗收站不重跑
+_check涵蓋 = ("tests/單元", "tests/流程", "plugins/telltale/hooks/")
 _ts副檔名 = (".test.ts", ".test.tsx")  # 這些走 bun test；其餘走 pytest
 _pytest沒收到測試 = 5
 _pytest收集錯誤 = 2

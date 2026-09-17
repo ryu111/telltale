@@ -1,13 +1,13 @@
 [
   {
     "label": "hello: placeholder missing when data is undefined",
-    "file": "hooks/panels/hello.ts",
+    "file": "plugins/telltale/hooks/panels/hello.ts",
     "old": "lines.push({ text: fit(\"hello · waiting for first tick\", columns), tone: \"dim\" });",
     "new": "return { id: \"hello\", lines: [] };"
   },
   {
     "label": "hello: placeholder line not fitted to columns",
-    "file": "hooks/panels/hello.ts",
+    "file": "plugins/telltale/hooks/panels/hello.ts",
     "old": "text: fit(\"hello · waiting for first tick\", columns)",
     "new": "text: \"hello · waiting for first tick\""
   }

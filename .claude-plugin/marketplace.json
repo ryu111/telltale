@@ -1,0 +1,29 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "telltale",
+  "metadata": {
+    "description": "telltale — a live status band for Claude Code, built on function hooks."
+  },
+  "owner": {
+    "name": "ryu111"
+  },
+  "plugins": [
+    {
+      "name": "telltale",
+      "description": "A live status band for Claude Code — multiple workflows at a glance, built on function hooks",
+      "version": "0.1.0",
+      "author": {
+        "name": "ryu111"
+      },
+      "source": "./plugins/telltale",
+      "category": "productivity",
+      "homepage": "https://github.com/ryu111/telltale",
+      "tags": [
+        "claude-code",
+        "function-hooks",
+        "tui",
+        "terminal"
+      ]
+    }
+  ]
+}

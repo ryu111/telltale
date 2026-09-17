@@ -1,10 +1,20 @@
 {
   "name": "telltale",
   "version": "0.1.0",
-  "description": "A live status band for Claude Code.",
+  "description": "A live status band for Claude Code — multiple workflows at a glance, built on function hooks",
   "author": {
     "name": "ryu111"
   },
+  "homepage": "https://github.com/ryu111/telltale",
+  "repository": "https://github.com/ryu111/telltale",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "function-hooks",
+    "tui",
+    "terminal",
+    "status-band"
+  ],
   "userConfig": {
     "panel_hello": {
       "type": "boolean",

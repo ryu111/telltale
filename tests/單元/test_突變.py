@@ -13,11 +13,12 @@ class 假bun:
     """依檔案內容決定紅綠：內容含 `BROKEN` 就紅（rc 1）。記下每次看到的內容。"""
 
     def __init__(self, 根: Path, 檔: str) -> None:
+        self.根 = 根
         self.檔 = 根 / 檔
         self.看到: list[str] = []
 
     def __call__(self, argv: Sequence[str], cwd: Path) -> int:
-        assert list(argv) == ["bun", "test", "hooks/"] and cwd == self.檔.parents[1]
+        assert list(argv) == ["bun", "test", 突變.測試目錄] and cwd == self.根
         內容 = self.檔.read_text("utf-8")
         self.看到.append(內容)
         return 1 if "BROKEN" in 內容 else 0
