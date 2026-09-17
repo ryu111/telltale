@@ -19,7 +19,7 @@
 | **v4** | 第 1 列同 v1；第 2 列＝壓成一條鏈的流程 `● prompt ─▸ ● think ─▸ ◉ Bash` | 高度只剩 2–3 列時 | 只剩第 1 列 |
 
 - 標題：`<狀態符號> <名字> <模型> <經過時間>`；名字 main 琥珀、subagent 紫；模型灰；時間藍。
-- 任務名稱：main＝這輪 prompt 的前 60 字（`turn.start.text`）；subagent＝`AgentInfo.description`；背景任務＝Bash 的 `description`（缺就 command 前 40 字）。放不下就**跑馬燈**（每 0.3 s 左移一格，循環中間隔 `   ·   `）。
+- 任務名稱：main＝這輪 prompt 的前 60 字（`turn.start.text`）；subagent＝`AgentInfo.description`；背景任務＝Bash 的 `description`（缺就 command 前 40 字）。放不下就**跑馬燈**（每 0.3 s 左移一格，循環中間隔 `   ·   `；所有放不下的都跑，使用者裁定）。
 - **鏡頭**（v1／v4 橫向）：目標＝最新節點右緣離區域右邊 28 欄（兩個節點寬＋一段連線）；每幀往目標移 25%，差 <1 格貼齊；最新節點永遠完整在畫面內。**v2 縱向**：硬鎖，最新節點永遠在 cell 最底一列，舊的往上推。
 - 節點寬度固定 12 欄（名字最多 8 字，超長 `…`）；名字＝工具名或 `think`／`prompt`／`reply`／`Agent`。
 
@@ -47,9 +47,10 @@
 | 目前節點 | 框每 `600 ms` 粗／細交替（呼吸）；經過時間每秒跳 |
 | cell running | 邊框暗綠；剛有事件的 1 s 內亮綠粗體 |
 | 新 cell | 從右緣滑入 `500 ms`（v2 從下緣） |
-| cell 完成 | 標題 `✓`、整個 cell 降到極暗灰；`3 s` 後收合（v1／v4 剩第 1 列；v2 縮成直欄）；`60 s` 後消失 |
+| cell 完成 | 標題 `✓`、整個 cell 降到極暗灰；`3 s` 後收合（v1／v4 剩第 1 列；v2 縮成直欄）；`60 s` 後消失。**main 的收合列會合併**：`✓ N turns · <最近一輪名稱>`，點了展開最近 3 輪 10 s |
 | cell 失敗 | 節點 `✗`、邊框紅、淡紅底；**留到點掉**或 `/telltale agents clear` |
-| 背景任務孤兒（30 min 沒通知） | 符號 `?` 黃，留到點掉 |
+| 背景任務久跑（> 30 min） | 經過時間變黃，仍是 running |
+| 背景任務孤兒（> 2 h 沒通知） | 符號 `?` 黃，留到點掉 |
 
 不做：閃爍、hover、滑出動畫以外的位移動畫。
 
@@ -65,9 +66,11 @@
 - 點失敗或孤兒的 cell：點掉。
 - 點面板標題列：循環段位（第一輪的規則）。
 
+時間常數全部是 `hooks/cells.ts` 的具名 export（`TRANSIT_MS`、`BIRTH_MS`、`BREATHE_MS`、`SLIDE_MS`、`COLLAPSE_AFTER_MS`、`VANISH_AFTER_MS`、`FLASH_MS`、`CAMERA_MARGIN`、`CAMERA_GAIN`、`MARQUEE_STEP_MS`、`LONG_RUN_MS`、`ORPHAN_MS`）；本檔的數字是它們的文件化，改了要一起改。
+
 ## 6. 真機要驗（票 16）
 
-1. subagent 內部的工具事件是否由 `turn.step` 帶 `agentId` 送到；拿不到 → subagent cell 只有 `spawned → running → done` 三個節點，main cell 才有完整流程。
+1. subagent 內部的工具事件是否由 `turn.step` 帶 `agentId` 送到；拿不到 → subagent cell 只有 `prompt → running → reply` 三個節點（動畫全套照用），main cell 才有完整流程。**退化要附嘗試紀錄才算數**；README 與面板標題要寫「subagent 內部細節不保證」。
 2. `Text` 的 `backgroundColor` 在 AbovePrompt／Pane 是否生效。
 3. 每幀（80 ms）重畫全滿 cell 的成本 < 5 ms（ClientModule 超時會被卸載）。
 4. Pane 在 150→100 欄換位置時 Client 的 `surface.columns` 是否跟著變（已知 `bodyColumns` 66→96）。
