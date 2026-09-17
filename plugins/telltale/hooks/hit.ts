@@ -26,6 +26,7 @@ export type BandProps = {
   panels: BandPanel[];
   dropped: string[];
   now: number;
+  status: boolean; // ticket 23: whether the last row is the status row (dropped or a panel error)
 };
 
 // What kind of message a title click should post: staged panels cycle their

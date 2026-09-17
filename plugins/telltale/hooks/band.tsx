@@ -62,7 +62,9 @@ const panelTitleLine = (label: string, columns: number): string => {
   return head + DASH.repeat(columns - headWidth);
 };
 
-// dropped > error > "updated Ns ago" (SDD §1.5).
+// dropped > error (SDD §1.5, ticket 23: the row only exists when one of
+// these applies — `props.status` gates whether this is even called for the
+// last row; called defensively with neither, it draws nothing).
 const statusLine = (props: BandProps, columns: number): string => {
   if (props.dropped.length > 0) {
     return fit(`⋯ ${props.dropped.join(", ")} not shown (height)`, columns);
@@ -71,10 +73,7 @@ const statusLine = (props: BandProps, columns: number): string => {
   if (errored) {
     return fit(`${errored.id}: ${errored.error}`, columns);
   }
-  const ats = props.panels.map((p) => p.at).filter((at): at is number => at !== null);
-  const latest = ats.length > 0 ? Math.max(...ats) : props.now;
-  const agoSeconds = Math.max(0, Math.floor((props.now - latest) / 1000));
-  return fit(`updated ${agoSeconds}s ago`, columns);
+  return "";
 };
 
 type Span2 = { text: string; tone2: Tone2 };
@@ -170,7 +169,12 @@ const buildRows = (
       rows[titleY + 1 + i] = line ? { text: fit(line.text, columns), tone: line.tone } : { text: "" };
     }
   }
-  rows[props.total - 1] = { text: statusLine(props, columns) };
+  // Ticket 23: the status row only exists (and only overwrites the last
+  // row) when `layout()` reserved it — otherwise that row already holds
+  // ordinary panel content from the loop above.
+  if (props.status) {
+    rows[props.total - 1] = { text: statusLine(props, columns) };
+  }
   // Defensive: any row `layout`/panels didn't account for still draws blank
   // rather than crashing on a hole in a sparse array.
   for (let i = 0; i < rows.length; i += 1) rows[i] ??= { text: "" };
