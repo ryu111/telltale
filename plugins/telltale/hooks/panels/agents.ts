@@ -3,10 +3,13 @@
 
 import { CONTENT_ROWS_MAX } from "../layout";
 import type { Panel } from "../panel";
-import { compressSteps, VANISH_AFTER_MS, COLLAPSE_AFTER_MS, ORPHAN_MS, type Cell, type Step } from "../cells";
+import { compressSteps, VANISH_AFTER_MS, COLLAPSE_AFTER_MS, ORPHAN_MS, MAIN_HISTORY_ID, type Cell, type Step } from "../cells";
 import type { PendingSpawn } from "../observe";
 
-export const MAIN_HISTORY_ID = "main-history";
+// Ticket 21: the id lives in cells.ts so renderCell (also in cells.ts) can
+// special-case it without importing this panel module. Re-exported here
+// because this is where callers (and tests) look for it.
+export { MAIN_HISTORY_ID };
 
 type Cells = Record<string, Cell>;
 
@@ -19,6 +22,9 @@ const applyAgentList = (cells: Cells, list: readonly { id: string; description: 
   for (const info of list) {
     const existing = working[info.id];
     if (!existing) {
+      // No description: nothing worth showing yet (ticket 21 — a subagent
+      // whose AgentInfo hasn't picked up a description never opens a cell).
+      if (info.description === "") continue;
       working = {
         ...working,
         [info.id]: {
@@ -146,6 +152,7 @@ export const agents: Panel<Cells> = {
   wantRows: CONTENT_ROWS_MAX,
   needsAgents: true,
   stages: { summary: 0, compact: 3, full: "rest" },
+  defaultStage: "full",
   everyMs: 1000,
   poll: async (io) => {
     let cells = (await io.cells!()) ?? {};

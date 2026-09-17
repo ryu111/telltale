@@ -72,7 +72,7 @@ async function buildBandProps(active: readonly Panel[], $: any, maxRows: number,
       .filter((p) => panelsState[p.id] ?? p.defaultOn)
       .map(async (p) => {
         if (!stagesOf(p)) return { id: p.id, minRows: p.minRows, wantRows: p.wantRows };
-        const stage = ((await $.store.get(`size.${p.id}`)) as Stage | undefined) ?? "compact";
+        const stage = ((await $.store.get(`size.${p.id}`)) as Stage | undefined) ?? p.defaultStage ?? "compact";
         const { minRows, wantRows } = rowsForStage(stage);
         return { id: p.id, minRows, wantRows };
       }),
@@ -175,6 +175,10 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
       }
     }
     await $.store.set("panels", panelsState);
+
+    // Ticket 21: a new session has no live task to show — cells left by a
+    // previous session (including its bg tasks) are stale, not resumable.
+    await $.store.set("agents.cells", {});
 
     await $.command.register({
       name: "telltale",
@@ -282,7 +286,7 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
       // branch in the real client, but ignore it defensively here too.
       if (stagesOf(p)) {
         const key = `size.${data.id}`;
-        const current = ((await $.store.get(key)) as Stage | undefined) ?? "compact";
+        const current = ((await $.store.get(key)) as Stage | undefined) ?? p.defaultStage ?? "compact";
         // Named `toStage`, not `next`: that identifier is reserved by the
         // hook's own continuation parameter (`claude plugin validate --strict`
         // rejects shadowing it).
@@ -317,23 +321,24 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
       await Promise.all(
         active
           .filter((p) => stagesOf(p))
-          .map(async (p) => [p.id, ((await $.store.get(`size.${p.id}`)) as Stage | undefined) ?? "compact"] as const),
+          .map(async (p) => [p.id, ((await $.store.get(`size.${p.id}`)) as Stage | undefined) ?? p.defaultStage ?? "compact"] as const),
       ),
     );
     // Ticket 17: `agents *` sub-commands need the panel's own current
     // style/edge/size/cells — only fetched when the panel is actually
     // registered (SDD §1.6 v0.2 table).
-    const agentsView: AgentsView | undefined = active.some((p) => p.id === "agents")
+    const agentsPanel = active.find((p) => p.id === "agents");
+    const agentsView: AgentsView | undefined = agentsPanel
       ? {
           style: ((await $.store.get("style.agents")) as AgentsView["style"] | undefined) ?? "v2",
           edge: ((await $.store.get("edge.agents")) as AgentsView["edge"] | undefined) ?? "right",
-          size: ((await $.store.get("size.agents")) as AgentsView["size"] | undefined) ?? "compact",
+          size: ((await $.store.get("size.agents")) as AgentsView["size"] | undefined) ?? agentsPanel.defaultStage ?? "compact",
           cells: ((await $.store.get("agents.cells")) as Cells | undefined) ?? {},
         }
       : undefined;
 
     const state: TelltaleState = {
-      order: active.map((p) => ({ id: p.id, label: p.label, stages: Boolean(stagesOf(p)) })),
+      order: active.map((p) => ({ id: p.id, label: p.label, stages: Boolean(stagesOf(p)), defaultStage: p.defaultStage })),
       panels: panelsState,
       sizes,
       layout: { slots, dropped, total },
