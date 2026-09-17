@@ -85,3 +85,9 @@ test("rule 2/5: every slot gets at least its minRows", () => {
     expect(r.total).toBeLessThanOrEqual(Math.max(1, Math.min(maxRows, BAND_ROWS_MAX)));
   }
 });
+
+test("layout.ts is pure: no imports at all (never claude-code, never $)", async () => {
+  const src = await Bun.file(new URL("./layout.ts", import.meta.url)).text();
+  expect(src).not.toMatch(/^\s*import\b/m);
+  expect(src).not.toContain("claude-code");
+});
