@@ -36,6 +36,7 @@
 | — | `ui.render{component=Spinner}` 給 `mode`（responding／tool-input／tool-use／thinking／requesting），沒有經過時間 | 經過時間從 `turn.start` 的時刻自己算 |
 | — | `session.start` hook 沒 `return next(e)` 整個被跳過（`hook failed: returned no result`），timer 也不會活 | 每個 hook 一律 `return next(e)`（I13） |
 | — | **2.1.274 實測（2026-09-17 升版後）**：`hooks.json` 無 `surface`、Client 用 `module="./band.tsx"`；`$.clock.now()` 回 Promise；`claude plugin test` 存在（kit：`claude-code/testing` 的 describe／test／expect／Engine `$`）；Pane 自適應（150 欄靠右 dock、100 欄變輸入框上方方框，`bodyColumns` 66→96） | 已遷移；v0.2 呈現層改成「寬→Pane、窄→引擎自動落下」（使用者裁定 2026-09-17）；票 19：評估把 harness 搬到 `claude plugin test`（DoD #2 原意） |
+| — | **`turn.step` 是串流事件**（票 12 實測）：hook 必須是 `async function* ($, e, next) { const result = yield* next(e); …; return result; }`，寫成 async function 會被 validate 拒（"not an async generator"）；`toolUses` 在 result 上 | 已照做；harness 的 fire 對 turn.step 走串流驅動 |
 | — | 平常載入：`~/.claude/skills/telltale` symlink 到 checkout 可行，`settings.json` 的 `env` 開旗標可行 | README／CLAUDE.md 已寫 |
 
 ## 穩定層（先定，定完盡量不動）
