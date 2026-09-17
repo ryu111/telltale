@@ -1,0 +1,26 @@
+[
+  {
+    "label": "elapsed: exact-minute keeps a spurious :00",
+    "file": "plugins/telltale/hooks/cells.ts",
+    "old": "String(remSeconds).padStart(2, \"0\")",
+    "new": "String(remSeconds || 1).padStart(2, \"0\")"
+  },
+  {
+    "label": "marquee: offset frozen, does not scroll",
+    "file": "plugins/telltale/hooks/cells.ts",
+    "old": "Math.floor(now / MARQUEE_STEP_MS)",
+    "new": "Math.floor(0 / MARQUEE_STEP_MS)"
+  },
+  {
+    "label": "sortCells: running no longer sorts first",
+    "file": "plugins/telltale/hooks/cells.ts",
+    "old": "a.status === \"running\" ? 0 : 1",
+    "new": "1"
+  },
+  {
+    "label": "fitCells: off-by-one leaks one extra cell into shown",
+    "file": "plugins/telltale/hooks/cells.ts",
+    "old": "sorted.slice(0, budget)",
+    "new": "sorted.slice(0, budget + 1)"
+  }
+]
