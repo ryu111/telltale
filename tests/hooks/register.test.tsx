@@ -6,8 +6,13 @@ import { fileURLToPath } from "node:url";
 import { clientOf, fakeEngine } from "./harness";
 import type { Panel } from "../../plugins/telltale/hooks/panel";
 import { makeRegister, register } from "../../plugins/telltale/hooks/register";
+import { hello } from "../../plugins/telltale/hooks/panels/hello";
+import { clock } from "../../plugins/telltale/hooks/panels/clock";
+// Round-one tests cover the two demo panels; v0.2 puts `agents` first in PANELS, so boot with an explicit registry.
+const demoRegister = makeRegister([hello, clock]);
 import { displayWidth } from "../../plugins/telltale/hooks/width";
 
+// Round-one ops (the demo registry exercises exactly these); the whole plugin declares ALLOWED_V02 (I12).
 const ALLOWED = [
   "$.ui.resolve",
   "$.ui.invalidate",
@@ -17,11 +22,12 @@ const ALLOWED = [
   "$.store.set",
   "$.command.register",
 ];
+const ALLOWED_V02 = [...ALLOWED, "$.agent.list", "$.env.get"]; // + $.ui.open / $.ui.close once ticket 16 lands
 
 type Opts = Parameters<typeof fakeEngine>[0];
 
-const boot = async (opts?: Opts, reg = register) => {
-  const eng = fakeEngine(opts);
+const boot = async (opts?: Opts, reg = demoRegister) => {
+  const eng = fakeEngine({ env: { TELLTALE_DEV: "1" }, ...(opts ?? {}) }); // demo panels only register under TELLTALE_DEV=1 (SDD §2.7)
   reg(eng.on, opts?.options ?? {});
   await eng.fire("session.start", {});
   return eng;
@@ -87,8 +93,8 @@ test("render hands a Client 'band' / module 'Band' whose props are plain JSON wi
 });
 
 test("I10: render before any data still draws every panel's placeholder", async () => {
-  const eng = fakeEngine();
-  register(eng.on, {});
+  const eng = fakeEngine({ env: { TELLTALE_DEV: "1" } });
+  demoRegister(eng.on, {});
   // no session.start: nothing polled, panels seeded lazily by render? No — SDD: seeds happen at start.
   await eng.fire("session.start", {});
   eng.store["data.hello"] = undefined;
@@ -208,10 +214,10 @@ test("I1: every allowed op is exercised at least once across start + tick + rend
   await render(eng);
   await eng.fire("ui.message", { data: { kind: "toggle", id: "clock" } });
   for (const op of ALLOWED) expect(eng.calls[op] ?? 0).toBeGreaterThan(0);
-  expect(Object.keys(eng.calls).sort()).toEqual([...ALLOWED].sort());
+  expect(Object.keys(eng.calls).sort()).toEqual([...ALLOWED, "$.env.get"].sort()); // session.start reads TELLTALE_DEV (SDD §2.7)
 });
 
-test("I1: claude plugin validate --strict reports exactly the seven allowed calls", () => {
+test("I1: claude plugin validate --strict reports exactly the allowed calls (I12)", () => {
   // Resolve the plugin root from this file, wherever the repo is checked out.
   const pluginDir = fileURLToPath(new URL("../../plugins/telltale/", import.meta.url)); // not .pathname: it percent-encodes non-ASCII worktree names
   const r = Bun.spawnSync(["claude", "plugin", "validate", "--strict", "--json", pluginDir], {
@@ -223,5 +229,5 @@ test("I1: claude plugin validate --strict reports exactly the seven allowed call
   const calls = notes
     .filter((n) => n.includes(" calls: "))
     .flatMap((n) => n.split("calls:")[1]!.split(",").map((s) => s.trim()));
-  expect(new Set(calls)).toEqual(new Set(ALLOWED));
+  expect(new Set(calls)).toEqual(new Set(ALLOWED_V02));
 });

@@ -9,7 +9,7 @@ import { displayWidth } from "../../plugins/telltale/hooks/width";
 const ID = /^[a-z][a-z0-9-]{0,15}$/;
 
 test("registry: hello then clock, unique ids that match the id grammar", () => {
-  expect(PANELS.map((p) => p.id)).toEqual(["hello", "clock"]);
+  expect(PANELS.map((p) => p.id)).toEqual(["agents", "hello", "clock"]); // v0.2: agents first; hello/clock only register under TELLTALE_DEV=1
   expect(new Set(PANELS.map((p) => p.id)).size).toBe(PANELS.length);
   for (const p of PANELS) expect(p.id).toMatch(ID);
 });
