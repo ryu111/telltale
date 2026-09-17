@@ -193,3 +193,13 @@ test("session.receive with a different origin is left alone by this hook (no mat
   await eng.fire("session.receive", { origin: { kind: "bridge" }, text: "hi" });
   expect(eng.store["agents.cells"]).toEqual({});
 });
+
+// ── 補題 (mutation #4 of ticket 12): the hook returns next's result, not a copy of the input (I13) ──
+test("session.receive: the hook returns what next(e) resolved, not input.text", async () => {
+  const eng = fakeEngine();
+  await boot(eng);
+  eng.store["agents.cells"] = {} satisfies Cells;
+  eng.setNextResult("session.receive", { text: "rewritten by a later plugin" });
+  const result = await eng.fire("session.receive", { origin: { kind: "task-notification" }, text: 'Background command "x" completed' });
+  expect(result).toEqual({ text: "rewritten by a later plugin" });
+});
