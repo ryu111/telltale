@@ -177,3 +177,10 @@ test.todo("v1 exact fixture: multi-step cell with a strip wider than w (camera h
 test.todo("v2 exact fixture: node list taller than h (hard-locked scroll, newest row always last)");
 test.todo("v4 exact fixture: chain wider than w (right-edge windowing)");
 test.todo("running cell: current-node tones (\"current\" / \"currentFailed\") and walked-node symbol keeps kind-tone (DESIGN §2)");
+
+// ── 補題 (review of ticket 14): the strip's "+N" overflow row must be observable (mutation #3) ──
+test("renderStrip: steps that do not fit end with a '+N' row (exact)", () => {
+  const five: Cell = { ...fixture, endAt: 0, steps: ["prompt", "think", "Read", "Bash", "reply"].map((name, i) => ({ name, t0: i, t1: i + 1 })) };
+  const { lines } = renderCell(five, "v2", 20, 4, 10_000, 0, NO_CAM); // room = 3 rows for steps: 2 shown + "+3"
+  expect(text(lines[3]!)).toBe("+3".padEnd(STRIP_W));
+});
