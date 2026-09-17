@@ -151,3 +151,48 @@ body——但具體數字不同，這裡記的是本票在 2.1.274 上重測的�
 ## 沒有機制守的（明寫，不留在中間）
 
 - `band.tsx` 的幀時鐘啟動守衛（`surface.every(80)` 只掛一次）**沒有自動測試**：band.tsx 從票 06 起就只靠 tmux 手動驗。原本票 16 的第 2 條突變因此全綠，已從 `tests/突變/16-band-cells.json` 拿掉；改壞它的症狀是每次 render 多掛一個 timer、CPU 慢慢上升，要用 tmux 開 2 分鐘看 debug log 的 settled 時間有沒有變長。
+
+## item 1（真資料，票 17 補測）
+
+2026-09-17，Claude Code 2.1.274，tmux（`-x 150 -y 40`，`--plugin-dir plugins/telltale --debug-file /tmp/t17.log`），worktree `band-17-agents指令與點擊`。
+票 17 把 `panels/agents.ts` 的 `view()` 從 placeholder 改成 `{ kind: "cells", cells }`、`register.tsx` 的 `buildBandProps` 對 `agents` 面板改讀 `agents.cells`（不再是 `data.agents`）之後，重跑票 16 留下的驗收：真派一個 subagent，看面板是否長出 `main`／`sub` 兩個 cell。
+
+指令：
+```
+tmux new-session -d -s t17 -x 150 -y 40 -c <worktree> "<claude 2.1.274> --plugin-dir <worktree>/plugins/telltale --debug-file /tmp/t17.log"
+# 等 log 出現 hooks module telltale loaded
+tmux send-keys -t t17 -l '用 Agent 工具（subagent_type Explore，model haiku，description "count files"）列 plugins/telltale/hooks 的檔數，然後回 ok'
+tmux send-keys -t t17 Enter
+```
+
+Debug log 關鍵行（`/tmp/t17.log`）：
+```
+164:...hooks module telltale loaded (worker, environment 1, tier user); events: session.start,ui.render,ui.message,command.run,turn.start,turn.step,turn.complete,session.receive
+304:...surface environment of telltale (environment 1) loaded hooks/band.tsx
+743:...[Stall] agent_completion agentId=aa56f4d9082904ace agentType=Explore exitPath=completed durationMs=10510 turns=4 finalStopReason=end_turn ...
+```
+`grep -nE "does not validate|hook failed|refused" /tmp/t17.log` 沒有任何一行（`Plugin loading errors` 那幾行是無關的既有現象：session-only `--plugin-dir` 跟 skills-dir 同名 `telltale` 互搶，不影響本次驗收，跟 hooks module 本身載入成功無關）。
+
+Capture（`tmux capture-pane -t t17 -p`），subagent 派出中：
+```
+⏺ Explore(count files) Haiku 4.5
+  ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)
+✻ Waiting for 1 background agent to finish
+telltale · 1 panels                                                             [-]│
+─ agents ──────────────────────────────────────────────────────────────────────────│
+✓ main 5m55 · <task-notification>                                                  │
+<task-id>a81ed81fb96771e36</task-id>                                               │
+✓ main 7s · 用 Agent 工具（subagent_type Explore，model haiku，description "co     │
+```
+
+subagent 完成後（`agent_completion` 出現後再 capture）：
+```
+telltale · 1 panels                                                             [-]│
+─ agents ──────────────────────────────────────────────────────────────────────────│
+✓ main 23m51 · <task-notification>                                                 │
+<task-id>aa56f4d9082904ace</task-id>                                               │
+✓ sub haiku 10s · count files                                                      │
+updated 0s ago                                                                     │
+```
+
+結論：`agents` 面板真的長出 `main` 與 `sub`（label 帶模型 `haiku` 與 description `count files`）兩個 cell，隨 `turn.step`／`task-notification` 事件自然出現，不是假資料撐出來的——票 17 的接線（`view()` 回 `{kind:"cells",cells}` ＋ `buildBandProps` 讀 `agents.cells`）確認生效。跟票 16 記錄的落差（`agents · 0 cells` 永遠不變）在此消失。測完 `tmux kill-session -t t17`。
