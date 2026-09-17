@@ -40,7 +40,12 @@ class 突變:
 
 
 def 讀清單(路徑: Path) -> list[突變]:
-    """沒有檔 = 空清單；有檔但欄位缺 = 清單壞，直接 KeyError 出去。"""
+    """一個 .json 檔，或一個目錄（裡面每個 .json 依檔名排序串起來：一票一檔，並行不撞）。
+
+    沒有檔 = 空清單；有檔但欄位缺 = 清單壞，直接 KeyError 出去。
+    """
+    if 路徑.is_dir():
+        return [m for f in sorted(路徑.glob("*.json")) for m in 讀清單(f)]
     if not 路徑.is_file():
         return []
     return [
@@ -98,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    p.add_argument("--清單", default="hooks/mutations.json")
+    p.add_argument("--清單", default="hooks/mutations")
     p.add_argument("--只", default="", help="只跑 label 含這個字串的")
     a = p.parse_args(argv)
     根 = Path.cwd()

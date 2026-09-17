@@ -1,7 +1,7 @@
 # 06-band：Client 畫帶子、點面板標題切換（hit.ts 純函式）
 
 - 對應 SDD 節次：§1.5；不變量 I4（Band 那一層）、I7（真引擎，tmux）
-- 可碰檔案：`hooks/band.tsx` `hooks/hit.ts` `hooks/mutations.json`
+- 可碰檔案：`hooks/band.tsx` `hooks/hit.ts` `hooks/mutations/NN-<slug>.json`（一票一檔）
 - 相關檔案：`docs/SDD.md`（§1.5、§7.4 顏色三條）、`hooks/width.ts`、`hooks/layout.ts`（`MIN_COLUMNS`）、`hooks/register.tsx`（`BandProps`／`BandPanel` 型別從這裡 import type）、`.claude/types/claude-code.d.ts`（第 835–880 行 `ClientElements`／`ClientModule`；第 887–915 行 `ClientPointerEvent`；第 968–1030 行 `ClientSurface`；第 6080–6100 行 `TextProps`）、`docs/tasks/band/00-共同規則.md`
 - 驗收測試：`hooks/hit.test.ts`
 - 完成條件：`make check` 全綠；驗收測試由紅轉綠；`make mutate` 對本票兩條突變全紅；code-review Spec 軸零缺漏、零超範圍

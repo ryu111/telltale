@@ -89,3 +89,12 @@ def test_清單為空_退出碼0_連基準都不跑(tmp_path: Path) -> None:
 
 def test_沒有清單檔_視為空() -> None:
     assert 突變.讀清單(Path("/nonexistent/mutations.json")) == []
+
+
+def test_目錄_一票一檔_依檔名串起來(tmp_path: Path) -> None:
+    d = tmp_path / "hooks/mutations"
+    d.mkdir(parents=True)
+    (d / "03-b.json").write_text('[{"label":"b","file":"f","old":"o","new":"n"}]', "utf-8")
+    (d / "02-a.json").write_text('[{"label":"a","file":"f","old":"o","new":"n"}]', "utf-8")
+    assert [m.label for m in 突變.讀清單(d)] == ["a", "b"]
+    assert 突變.讀清單(tmp_path / "hooks/nope") == []

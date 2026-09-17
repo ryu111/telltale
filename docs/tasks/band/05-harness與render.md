@@ -1,7 +1,7 @@
 # 05-harness 與 render：假引擎、session.start、poll 迴圈、ui.render 組 Client props
 
 - 對應 SDD 節次：§1.4、§1.5（BandProps）、§2.1、§2.4、§3 Pipeline、§4；不變量 I1、I4、I5、I7（fake 層）、I8、I10、I11
-- 可碰檔案：`hooks/harness.ts` `hooks/register.tsx` `hooks/mutations.json`
+- 可碰檔案：`hooks/harness.ts` `hooks/register.tsx` `hooks/mutations/NN-<slug>.json`（一票一檔）
 - 相關檔案：`docs/SDD.md`（§1.4、§1.5、§2.1、§3、§4、§5）、`hooks/layout.ts`、`hooks/panel.ts`、`hooks/panels/index.ts`、`hooks/width.ts`、`.claude/types/claude-code.d.ts`（第 4895–4935 行 `RenderInputOf`；第 5170–5210 行 `AbovePrompt` props；第 918–960 行 `ClientProps`；第 1787–1846 行 `$.store`／`$.clock`；第 1690–1702 行 `$.command.register`；第 2160–2170 行 `ui.message`；第 3474–3480 行 `On`；第 4623–4700 行 `RenderElement`；第 6960–6990 行 `h`／`Fragment` 全域）、`docs/tasks/band/00-共同規則.md`
 - 驗收測試：`hooks/register.test.tsx`
 - 完成條件：`make check` 全綠；驗收測試由紅轉綠；`make mutate` 對本票四條突變全紅；code-review Spec 軸零缺漏、零超範圍

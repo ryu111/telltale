@@ -1,7 +1,7 @@
 # 07-command：/telltale（純解析＋格式化 + command.run hook）
 
 - 對應 SDD 節次：§1.6；§3 的 `command.run` 分支
-- 可碰檔案：`hooks/command.ts` `hooks/register.tsx` `hooks/mutations.json`
+- 可碰檔案：`hooks/command.ts` `hooks/register.tsx` `hooks/mutations/NN-<slug>.json`（一票一檔）
 - 相關檔案：`docs/SDD.md`（§1.6、§3）、`hooks/harness.ts`（測試用的假引擎，唯讀）、`hooks/layout.ts`、`.claude/types/claude-code.d.ts`（第 1156–1215 行 `CommandRunInput`／`CommandRunResult`）、`docs/tasks/band/00-共同規則.md`
 - 驗收測試：`hooks/command.test.ts`
 - 完成條件：`make check` 全綠；驗收測試由紅轉綠；`make mutate` 對本票兩條突變全紅；code-review Spec 軸零缺漏、零超範圍

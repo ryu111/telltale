@@ -26,6 +26,6 @@ tickets:
 	$(PY) python scripts/跑全部票.py $(F)
 
 # 測試有沒有在測：題目 §5.2 的突變清單（故意改壞一行 → 測試要轉紅）。跑票.py 的第 5 站會叫它。
-# 清單 hooks/mutations.json 為空時印 0 mutations declared、綠；每張票要 append 自己的條目。
+# 清單 hooks/mutations/ 沒有檔時印 0 mutations declared、綠；每張票要 append 自己的條目。
 mutate:
 	$(PY) python scripts/突變.py
