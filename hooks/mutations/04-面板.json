@@ -6,9 +6,9 @@
     "new": "return { id: \"hello\", lines: [] };"
   },
   {
-    "label": "panels: line not fitted to columns",
+    "label": "hello: placeholder line not fitted to columns",
     "file": "hooks/panels/hello.ts",
-    "old": "lines.push({ text: fit(`寬 ${columns} 欄 · 高 ${rows} 列`, columns), tone: \"dim\" });",
-    "new": "lines.push({ text: `寬 ${columns} 欄 · 高 ${rows} 列`, tone: \"dim\" });"
+    "old": "text: fit(\"hello · waiting for first tick\", columns)",
+    "new": "text: \"hello · waiting for first tick\""
   }
 ]
