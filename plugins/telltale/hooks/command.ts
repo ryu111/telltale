@@ -6,9 +6,27 @@ import type { Cell } from "./cells";
 
 export type AgentsView = {
   style: "auto" | "v1" | "v2" | "v4";
-  edge: "right" | "bottom" | "both";
+  // Ticket 29 (SDD §2.8 "換邊 auto 退路"): "auto" is a settable/reportable
+  // value again, distinct from a stored right/bottom/both — see
+  // `effectiveEdge` below for what it resolves to at render time.
+  edge: "auto" | "right" | "bottom" | "both";
   size: "summary" | "compact" | "full";
   cells: Record<string, Cell>;
+};
+
+// Ticket 29 (SDD §2.8 "換邊 auto 退路"): the one place that turns a *stored*
+// edge value plus "has the Pane's `ui.render` ever actually reached this
+// session" into the value every render site and the title-row buttons act
+// on. `stored` right/bottom/both always win outright (an explicit choice is
+// never second-guessed by `paneSeen`); no value stored, or the literal
+// "auto", falls back to whether the Pane has shown up yet — `bottom` (draw
+// above the prompt) until it has, `right` once it has.
+export const effectiveEdge = (
+  stored: "auto" | "right" | "bottom" | "both" | undefined,
+  paneSeen: boolean,
+): "right" | "bottom" | "both" => {
+  if (stored === "right" || stored === "bottom" || stored === "both") return stored;
+  return paneSeen ? "right" : "bottom";
 };
 
 export type TelltaleState = {
@@ -153,7 +171,9 @@ const agentsCommand = (tokens: readonly string[], state: TelltaleState): Telltal
 
   if (sub === "edge") {
     if (tokens.length === 2) return { text: `agents edge: ${view.edge}`, panels: state.panels, sizes: state.sizes };
-    if (tokens.length === 3 && (value === "right" || value === "bottom" || value === "both")) {
+    // Ticket 29: "auto" is settable too — puts the effective value back
+    // under the Pane's own "has it rendered yet" control (register.tsx).
+    if (tokens.length === 3 && (value === "auto" || value === "right" || value === "bottom" || value === "both")) {
       return agentsSet("edge.agents", "edge", view.edge, value, state);
     }
     if (tokens.length === 3 && (value === "top" || value === "left")) {

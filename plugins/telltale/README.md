@@ -53,7 +53,7 @@ v0.2 adds a sub-vocabulary for the `agents` panel:
 | Input | Output |
 |---|---|
 | `/telltale agents style`, `agents style auto\|v1\|v2\|v4` | `agents style: auto` (the default — follows placement) / `agents style: auto → v1`; same value replies `(unchanged)` |
-| `/telltale agents edge`, `agents edge right\|bottom\|both` | Same format (`right` when nothing is stored); a value the engine doesn't have replies `edge top: not available in this build` |
+| `/telltale agents edge`, `agents edge auto\|right\|bottom\|both` | Same format (`auto` when nothing is stored); a value the engine doesn't have replies `edge top: not available in this build` |
 | `/telltale agents size`, `agents size summary\|compact\|full` | Same format, backed by the `size.agents` store key |
 | `/telltale agents clear` | Dismisses every failed/killed cell and every orphan lane: `agents: cleared 2` |
 | `/telltale status` | Now prints an extra segment per panel: `● agents  on   compact  3 rows` |
@@ -86,14 +86,21 @@ line, for when there's only 2–3 rows of height). The default is `auto` — `v2
 when the `Pane` is docked, `v1` when it sits above the prompt; setting a
 concrete style (by command or by the title-row buttons below) overrides that
 until you set it back to `auto`. `/telltale agents edge` (or the title-row
-`[R B RB]` buttons) switches where `agents` draws, three ways: `right` (the
-default — a `Pane`; the engine docks it beside the transcript from ~110
-columns and drops it above the prompt when narrower), `bottom` (the
-AbovePrompt band only — no `Pane`), `both` (`agents` stays in the `Pane`,
-every other panel moves to the AbovePrompt band instead). The v0.2 design
-draft sketched all four screen edges; `top`/`left` are not positions the
-engine offers, so those answer `not available in this build` — that's an
-engine limitation, not telltale giving up on the idea.
+`[R B RB]` buttons) switches where `agents` draws: `right` (a `Pane`; the
+engine docks it beside the transcript from ~110 columns and drops it above
+the prompt when narrower), `bottom` (the AbovePrompt band only — no `Pane`),
+`both` (`agents` stays in the `Pane`, every other panel moves to the
+AbovePrompt band instead). The default is `auto` — telltale still asks the
+engine for a `Pane`, but keeps drawing the whole band above the prompt until
+that `Pane`'s own `ui.render` actually reaches it (some hosts open the
+surface and then never render it, cmux included); the first time it does,
+telltale yields above the prompt and everything moves into the `Pane` from
+then on. Set `right` explicitly to force `Pane`-only up front (nothing shows
+if that host never renders the `Pane` either — that's a choice you made, not
+a fallback). The v0.2 design draft sketched all four screen edges; `top`/
+`left` are not positions the engine offers, so those answer `not available
+in this build` — that's an engine limitation, not telltale giving up on the
+idea.
 
 **`TELLTALE_DEV`**: the `hello` and `clock` panels only register when
 `TELLTALE_DEV=1` is set before Claude Code starts; a regular install only
