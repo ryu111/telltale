@@ -2,7 +2,7 @@
   {
     "label": "session.start keeps stale cells",
     "file": "plugins/telltale/hooks/register.tsx",
-    "old": "    await $.store.set(\"agents.cells\", {});",
+    "old": "      await $.store.set(liveKey(\"agents.cells\"), {});",
     "new": ""
   },
   {
