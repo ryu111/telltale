@@ -42,3 +42,4 @@ v0.2 檢查（出題者對過）：12／13／16／17 的路徑已改成 `plugins
 | 26-session隔離 | §2.8 session 隔離；§2.1 分鍵；I12（+session.id、store.keys／delete） | `tests/hooks/headless.test.tsx`（＋既有測試改 `agents.cells.<sid>`、validate 白名單、README 貼文） | register.tsx、README | 24、25 |
 | 27-換邊三態 | §2.8 換邊三態、`[R B RB]`；§1.6 `edge both`；I12（+ui.close） | `tests/hooks/edge.test.tsx`（＋buttons／agents-command／validate／readme 改版） | register.tsx、command.ts、hit.ts、band.tsx、README | 26 |
 | 28-真機實測v02b | §2.8 全部；規則 4b | `docs/實測/v02b.md` | docs 與坑 | 27 |
+| 29-換邊auto退路 | §2.8 換邊 auto 退路；§1.6 `edge auto` | `tests/hooks/edge-auto.test.tsx` | register.tsx、command.ts、README | 28 |
