@@ -23,7 +23,7 @@
 | 19-plugin-test評估 | 切片 #19；§4 | 手動 `docs/實測/plugin-test.md` | tests/plugin-test/ | — |
 | 20-desc單行 | §2.6a；DESIGN §1；票 17 實測 | `tests/hooks/observe-desc.test.tsx` | observe.ts | 17 |
 
-v0.2 批次（可碰檔案不交集才同批）：B1 {10, 11, 19} → B2 {12, 14} → B3 {13, 15} → B4 {16} → B5 {17} → B6 {18, 20} → B7 {21} → B8 {22} → B9 {23}。2026-09-18 全部 merged（21 於真機實測後補開，同日 merged）。
+v0.2 批次（可碰檔案不交集才同批）：B1 {10, 11, 19} → B2 {12, 14} → B3 {13, 15} → B4 {16} → B5 {17} → B6 {18, 20} → B7 {21} → B8 {22} → B9 {23}。2026-09-18 全部 merged（21 於真機實測後補開，同日 merged）。v0.2b（2026-09-18 真機回饋）：B10 {24, 25} → B11 {26} → B12 {27} → 28（主 agent 真機）。
 v0.2 檢查（出題者對過）：12／13／16／17 的路徑已改成 `plugins/telltale/…` 全路徑（範圍 hook 比對整串）；harness 擴充歸 12；`Panel.stages` 由 11 加欄位；`turn.step` 的 toolUses 在 result；`session.receive` matcher 是物件。
 
 檢查（出題者自己對過）：
@@ -37,3 +37,8 @@ v0.2 檢查（出題者對過）：12／13／16／17 的路徑已改成 `plugins
 | 21-真機細修 | §2.1、§2.6、§2.6a、§1.2 規則 8；主 agent 真機實測 | `tests/hooks/session-scope.test.tsx` | observe.ts、panels/agents.ts、register.tsx、panel.ts、cells.ts | 20 |
 | 22-空stub不留 | §2.6、§2.6a；DESIGN §1；票 21 後真機實測 | `tests/hooks/empty-stub.test.ts` | panels/agents.ts | 21 |
 | 23-狀態列有事才出現 | §1.2 規則 1／2／5、§1.5 末列、I3；使用者裁定 | `tests/hooks/status-row.test.tsx`（＋改寫 layout.test.ts、session-scope 一數字） | layout.ts、hit.ts、band.tsx、register.tsx、README | 22 |
+| 24-標題列按鍵 | §2.8 按鍵、樣式預設依 placement；§1.6 `style auto`；DESIGN §4／§5 | `tests/hooks/buttons.test.tsx` | hit.ts、band.tsx、register.tsx、command.ts、README | 23 |
+| 25-tool次數 | §2.8 tool 次數；DESIGN §1 | `tests/hooks/tool-count.test.ts` | cells.ts | 23 |
+| 26-session隔離 | §2.8 session 隔離；§2.1 分鍵；I12（+session.id、store.keys／delete） | `tests/hooks/headless.test.tsx`（＋既有測試改 `agents.cells.<sid>`、validate 白名單、README 貼文） | register.tsx、README | 24、25 |
+| 27-換邊三態 | §2.8 換邊三態、`[R B RB]`；§1.6 `edge both`；I12（+ui.close） | `tests/hooks/edge.test.tsx`（＋buttons／agents-command／validate／readme 改版） | register.tsx、command.ts、hit.ts、band.tsx、README | 26 |
+| 28-真機實測v02b | §2.8 全部；規則 4b | `docs/實測/v02b.md` | docs 與坑 | 27 |

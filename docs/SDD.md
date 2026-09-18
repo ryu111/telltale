@@ -206,8 +206,8 @@ v0.2 追加：
 
 | 輸入 | 輸出 |
 |---|---|
-| `/telltale agents style` ／ `style v1|v2|v4` | `agents style: v2`／`agents style: v2 → v1`；相同回 `(unchanged)` |
-| `/telltale agents edge` ／ `edge right|bottom` | 同上；引擎沒有的值回 `edge top: not available in this build` |
+| `/telltale agents style` ／ `style auto|v1|v2|v4` | `agents style: auto`／`agents style: auto → v1`；相同回 `(unchanged)`（v0.2b：沒存過就是 `auto`＝依 placement 決定，§2.8） |
+| `/telltale agents edge` ／ `edge right|bottom|both` | 同上；引擎沒有的值回 `edge top: not available in this build`（v0.2b：三態語意見 §2.8） |
 | `/telltale agents size` ／ `size summary|compact|full` | 同上格式，鍵 `size.agents` |
 | `/telltale agents clear` | 點掉所有 failed／killed 與孤兒 lane：`agents: cleared 2` |
 | `/telltale status` | 每個面板多印段位：`● agents  on   compact  3 rows` |
@@ -231,10 +231,11 @@ v0.2 追加的鍵（仍是完備表；每鍵 < 64 KiB，I5 同樣適用）：
 | 鍵 | 值 | 誰寫 |
 |---|---|---|
 | `size.<id>` | `"summary" \| "compact" \| "full"` | stage 訊息、`/telltale <id> size` |
-| `agents.cells` | `{ [cellId]: Cell }`（§2.6 的形狀；main 的 cellId = turnId、sub = agentId、bg = `${startAt}-${description}`）；completed 60 s 後刪、failed／孤兒留到 dismissed | poll 與各觀察型 hook |
-| `style.agents` | `"v1" \| "v2" \| "v4"` | `/telltale agents style` |
-| `edge.agents` | `"right" \| "bottom"`（引擎有的才收） | `/telltale agents edge` |
-| `agents.expanded` | `{ id, at } \| null`（完成的 cell 被點開，10 s 後 Client 視為 null） | row 訊息 |
+| `agents.cells.<sid>`（v0.2b 前是 `agents.cells`） | `{ [cellId]: Cell }`（§2.6 的形狀；main 的 cellId = turnId、sub = agentId、bg = `${startAt}-${description}`）；completed 60 s 後刪、failed／孤兒留到 dismissed。**`<sid>` = `$.session.id()`，一個 session 只讀寫自己的**（§2.8） | poll 與各觀察型 hook |
+| `style.agents` | `"auto" \| "v1" \| "v2" \| "v4"`（沒存過視同 `auto`） | `/telltale agents style`、標題列按鍵 |
+| `edge.agents` | `"right" \| "bottom" \| "both"`（沒存過視同 `right`；引擎沒有的 top／left 不收） | `/telltale agents edge`、標題列按鍵 |
+| `agents.expanded.<sid>` | `{ id, at } \| null`（完成的 cell 被點開，10 s 後 Client 視為 null） | row 訊息 |
+| `error.agents.<sid>` | 同 `error.<id>`，但 agents 的按 session 分（§2.8） | agents 的 tick |
 | `agents.hinted` | `true`（首次啟用提示已顯示） | 第一次 render |
 
 #### 2.2 面板註冊表（`hooks/panels/index.ts`）
@@ -294,6 +295,23 @@ subagent 迴圈的 `turn.step` 是否帶 `agentId` 送進來 → 票 16 實測�
 - 目錄（2026-09-17 使用者裁定「專案結構跟 plugin 結構要拆開」）：repo 根是 marketplace（`.claude-plugin/marketplace.json`，`source: ./plugins/telltale`）＋開發工具；plugin 本體整個在 `plugins/telltale/`（`.claude-plugin/plugin.json`、`hooks/`、README、LICENSE）。本文件所有 `hooks/…` 路徑相對 `plugins/telltale/`；bun 測試與 `harness.ts` 在 `tests/hooks/`（plugin 目錄只放功能）；突變清單在 `tests/突變/`。
 - 開發：`--plugin-dir <repo>/plugins/telltale`；正式：`claude plugin marketplace add ryu111/telltale` → `claude plugin install telltale@telltale`；或放 `~/.claude/skills/telltale/`。同名時 `--plugin-dir` 優先。
 - 卸載：`claude plugin uninstall telltale` 刪 `${CLAUDE_PLUGIN_DATA}`，但 **`$.store` 的檔（`~/.claude/plugins/store/`）官方文件沒說會刪**——README 寫清楚檔案位置與一行清除指令。plugin 自己不做「卸載時清 store」（沒有這種事件）。
+
+#### 2.8 v0.2b（2026-09-18 真機回饋，使用者裁定；票 24–28）
+
+**標題列按鍵（票 24／27）**：`agents` 面板的 `─ agents ─…─` 標題列右側、`TITLE_RESERVE` 死區左邊，右對齊放一條按鍵帶：`[1 2 3] [S C F] [R B RB] [x]`（各組只在 `BandPanel.buttons` 有對應欄位時出現；票 24 先做 `1 2 3`／`S C F`／`x`，票 27 加 `R B RB`）。目前生效的那顆粗體（tone2 `white`），其餘 `grey`，括號 `greyDeep`；顏色不多載第二種語義（題目 §7.4）。`hooks/hit.ts` 的純函式 `buttonSpans(id, buttons, columns)` 是**唯一**的座標來源（畫與命中同一份，與 `rowsOf` 同一條規則）；放不下（`columns - TITLE_RESERVE < 標題頭寬 + 1 + 帶寬`）就整條不畫、標題列照舊。點擊：`resolveTitleClick(y, x, props, columns)` 先判 `hitPanel`，落在按鍵格 → post 該按鍵的訊息，否則回舊規則（有 stages 的 `stage`、沒有的 `toggle`）。訊息：`{ kind: "style", id, value }` 寫 `style.agents`；`{ kind: "size", id, value }` 直接寫 `size.<id>`（不是循環）；`{ kind: "clear", id }` 同 `/telltale agents clear`；`{ kind: "edge", id, value }` 同 `/telltale agents edge <value>`。按鍵與指令寫同一個鍵（票 11 的規則）。
+
+**樣式預設依 placement（票 24；DESIGN §4「貼側邊→v2，貼上下→v1」一直沒實作）**：`style.agents` 沒存或 `"auto"` 時，`Pane` render 的 `e.props.placement === "dock"` → `v2`，`inline` 與 `AbovePrompt` → `v1`；存了 v1／v2／v4 就照存的。`buildBandProps` 多收 `placement: "dock" | "inline"`；`BandPanel.buttons.style` 是**生效**的樣式（按鍵粗體用它）。
+
+**cell 標題列 tool 次數（票 25）**：`toolCount(cell)` = `steps` 裡 `name ∉ { prompt, think, reply, Agent }` 的個數；≥ 1 時標題列固定段（經過時間之後、任務名稱之前）多一段 ` · N tools`，0 時不顯示（放在固定段而不是尾巴，因為尾巴是跑馬燈、會被擠掉）。main 的歷史合併列 `✓ N turns · …` 不加。
+
+**session 隔離（票 26）**：
+- `session.start` 的 `e.isInteractive === false`（`-p`、SDK、Claude Desktop 的 stream-json）→ **整個 plugin 不動**：不寫任何 store 鍵、不 `$.ui.open`、不註冊 tick、觀察型 hook 一律直接 `return next(e)`、`ui.render` 直接 `next(e)`、`command.run` 回 `telltale: idle (headless session)`；只保留 `$.command.register`。真機根因：Desktop 的 4 個 headless 程序每秒 `$.agent.list` 失敗（`not available in this mode: no session is bound`）寫進共用 store，終端機那條帶子讀到就顯示。
+- live 資料按 session 分鍵：`agents.cells.<sid>`、`agents.expanded.<sid>`、`error.agents.<sid>`，`<sid>` 來自 `$.session.id()`（transcript 檔名，resume 不變），在 `session.start` 讀一次存進 module 變數。設定鍵（`panels`、`size.*`、`style.agents`、`edge.agents`、`agents.hinted`）仍全域（挑毛病 Q2）。使用者 2026-09-18 裁定：別的 session 的 cell 混進來會看錯。
+- 清舊：`session.start` 用 `$.store.keys()` 找 `agents.cells.<other>`，其 cells 最大 `updatedAt` 早於 `now − STALE_SESSION_MS (24 h)`（或空物件）就 `$.store.delete` 它與同 sid 的 `agents.expanded.<sid>`／`error.agents.<sid>`；自己的 `agents.cells.<sid>` 照票 21 設成 `{}`。活著的別人（24 h 內有更新）不動。
+- agents 的 tick 成功時**要**寫 `error.agents.<sid> = ""`（舊碼只在 catch 寫、成功不清，一次失敗就永遠顯示）。
+- `calls:` 因此多 `$.session.id`、`$.store.keys`、`$.store.delete`（I12 更新；README 貼新輸出並解釋）。
+
+**換邊三態（票 27）**：`edge.agents ∈ { right, bottom, both }`，沒存視同 `right`。`right`：`session.start` `$.ui.open` Pane，`ui.render{AbovePrompt}` 直接 `return next(e)`（只畫 Pane；窄終端時引擎自己把 Pane 落到輸入框上方）。`bottom`：不 open（已開就 `$.ui.close({ id: "telltale" })`），全部面板由 AbovePrompt 畫，`ui.render{Pane}` 回 `next(e)`。`both`：Pane 只畫 `agents`，AbovePrompt 畫其餘面板（沒有其餘就 `next(e)`）。切換（指令或按鍵）時：寫鍵 → 依新值 open／close → invalidate。top／left 仍回 `not available in this build`。README「引擎只給右側 dock 與輸入框上方兩個位置」那句改成三態說明。
 
 ### 3. Pipeline（產品的執行流程）
 
@@ -380,7 +398,7 @@ v0.2 追加：fakeEngine 多 `agents: AgentInfo[]`（`$.agent.list` 回它的副
 | I9 | 不 hook `tool.call`／`classic.*`、不宣告 `process.*`／`fs.*`／`http.*`；`hooks.json` 只列一個 module | I1 涵蓋 |
 | I10 | 面板 `view` 拿到 `undefined` 也畫（不空白） | 單元測試 |
 | I11 | 每個寬度 ≥ MIN_COLUMNS 且 maxRows ≥ 4 時，畫面上至少有一行面板內容（擋「全砍掉就不會超寬」） | 切片 8 的腳本每步斷言 |
-| I12（v0.2） | `calls:` 恰好 = 七個 ＋ `$.agent.list` ＋ `$.env.get` ＋ `$.ui.open`（十個；`$.ui.close` 預留但 v0.2 沒用到，validate 不會列；Pane 需要 open；`$.ui.*` 只畫東西，題目 DoD #1 的字面清單據此擴充，README 要說明）；`hooks:` 恰好 = 第一輪四個 ＋ `turn.start`、`turn.step`、`turn.complete`、`ui.render{component=Spinner}`、`ui.render{component=Pane}`、`session.receive{origin=task-notification}`（十個；恰好的 exact 測試由票 16 收緊，12／13 只驗 ⊆）；仍無 `tool.call`／`classic.*` | I1 的測試改成 v0.2 的兩行 exact；README 區塊同步 |
+| I12（v0.2；v0.2b 票 26 起再加 `$.session.id`、`$.store.keys`、`$.store.delete`，票 27 起加 `$.ui.close`，共十四個） | `calls:` 恰好 = 七個 ＋ `$.agent.list` ＋ `$.env.get` ＋ `$.ui.open`（十個；`$.ui.close` 預留但 v0.2 沒用到，validate 不會列；Pane 需要 open；`$.ui.*` 只畫東西，題目 DoD #1 的字面清單據此擴充，README 要說明）；`hooks:` 恰好 = 第一輪四個 ＋ `turn.start`、`turn.step`、`turn.complete`、`ui.render{component=Spinner}`、`ui.render{component=Pane}`、`session.receive{origin=task-notification}`（十個；恰好的 exact 測試由票 16 收緊，12／13 只驗 ⊆）；仍無 `tool.call`／`classic.*` | I1 的測試改成 v0.2 的兩行 exact；README 區塊同步 |
 | I13（v0.2） | 每個 hook 都 `return next(e)`（觀察型 hook 不改任何事件的結果），且每種事件對 `agents.cells` 的寫入內容正確 | 流程測試：每種事件打進去，`next` 恰好一次且回傳 === next 的回傳，**並斷言寫進 store 的 cell 內容**（節點名、t0、desc）；突變：拿掉一個 `return next(e)`、把節點名寫死 |
 | I14（v0.2） | `renderCell` 輸出的每一列 `displayWidth ≤ w`，任何 `now`／`frame`／`cam`／style／cell 組合 | 單元＋property 測試（含 w 20、任務名稱全中文、64 步）；突變：elapsed 不裁 |
 | I15（v0.2） | 排序穩定：同一組 cells 任何順序輸入，`sortCells` 輸出相同；running 在前，其後依 firstAt，再依 id | property 測試（隨機打亂 50 次，含同 firstAt 的案例） |
