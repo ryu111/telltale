@@ -51,10 +51,10 @@ test("session.start opens the Pane for right / both / unset, not for bottom", as
 
 // ── which site draws what ──
 
-test("right: AbovePrompt yields to next; the Pane draws every panel", async () => {
+test("right: the Pane draws every panel; once it has rendered, AbovePrompt yields to next (ticket 30)", async () => {
   const eng = await boot({ "edge.agents": "right" });
-  expect(await renderAbove(eng)).toEqual(eng.NEXT_RENDER);
   expect(panelIds(await renderPane(eng))).toEqual(["agents", "hello"]);
+  expect(await renderAbove(eng)).toEqual(eng.NEXT_RENDER);
 });
 
 test("bottom: AbovePrompt draws every panel; the Pane yields", async () => {

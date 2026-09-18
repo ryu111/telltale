@@ -1,5 +1,6 @@
-// Ticket 29: with no stored edge, the band keeps drawing above the prompt until the Pane
-// actually renders, then yields; an explicit `right` forces Pane-only. SDD §2.8 "換邊 auto 退路". Exact.
+// Ticket 29 + 30: with no stored edge, or an explicit `right`, the band keeps drawing above the
+// prompt until the Pane actually renders, then yields (ticket 30: the R button on a host that never
+// renders the Pane must not blank the band). SDD §2.8 "換邊 auto 退路". Exact.
 import { expect, test } from "bun:test";
 import { clientOf, fakeEngine } from "./harness";
 import { effectiveEdge, runTelltale, type TelltaleState } from "../../plugins/telltale/hooks/command";
@@ -45,7 +46,8 @@ test("effectiveEdge (pure): stored values win; auto/undefined follows whether th
   expect(effectiveEdge(undefined, true)).toBe("right");
   expect(effectiveEdge("auto", false)).toBe("bottom");
   expect(effectiveEdge("auto", true)).toBe("right");
-  expect(effectiveEdge("right", false)).toBe("right");
+  expect(effectiveEdge("right", false)).toBe("bottom"); // ticket 30
+  expect(effectiveEdge("right", true)).toBe("right");
   expect(effectiveEdge("bottom", true)).toBe("bottom");
   expect(effectiveEdge("both", false)).toBe("both");
 });
@@ -75,8 +77,11 @@ test("a stored 'auto' behaves exactly like nothing stored", async () => {
   expect(await renderAbove(eng)).toEqual(eng.NEXT_RENDER);
 });
 
-test("an explicit 'right' forces Pane-only even before the Pane has rendered", async () => {
+test("an explicit 'right' (ticket 30) also draws above the prompt until the Pane renders, then yields", async () => {
   const eng = await boot({ "edge.agents": "right" });
+  expect(eng.opened).toEqual(["telltale"]);
+  expect(panelIds(await renderAbove(eng))).toEqual(["agents", "hello"]);
+  await renderPane(eng);
   expect(await renderAbove(eng)).toEqual(eng.NEXT_RENDER);
 });
 
