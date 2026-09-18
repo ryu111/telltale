@@ -1,0 +1,26 @@
+[
+  {
+    "label": "button zone falls through to stage cycling",
+    "file": "plugins/telltale/hooks/hit.ts",
+    "old": "  if (panel?.buttons) {",
+    "new": "  if (false && panel?.buttons) {"
+  },
+  {
+    "label": "active button not derived from effective style",
+    "file": "plugins/telltale/hooks/hit.ts",
+    "old": "const styleGroup = (id: string, buttons: TitleButtons): ButtonDef[] => [\n  { text: \"1\", message: { kind: \"style\", id, value: \"v1\" }, active: buttons.style === \"v1\" },\n  { text: \"2\", message: { kind: \"style\", id, value: \"v2\" }, active: buttons.style === \"v2\" },\n  { text: \"3\", message: { kind: \"style\", id, value: \"v4\" }, active: buttons.style === \"v4\" },\n];",
+    "new": "const styleGroup = (id: string, buttons: TitleButtons): ButtonDef[] => [\n  { text: \"1\", message: { kind: \"style\", id, value: \"v1\" }, active: false },\n  { text: \"2\", message: { kind: \"style\", id, value: \"v2\" }, active: false },\n  { text: \"3\", message: { kind: \"style\", id, value: \"v4\" }, active: false },\n];"
+  },
+  {
+    "label": "docked default style is v1",
+    "file": "plugins/telltale/hooks/register.tsx",
+    "old": "placement === \"dock\" ? \"v2\" : \"v1\"",
+    "new": "placement === \"dock\" ? \"v1\" : \"v1\""
+  },
+  {
+    "label": "size button cycles instead of setting",
+    "file": "plugins/telltale/hooks/register.tsx",
+    "old": "      const p = idx.get(data.id)!;\n      if (stagesOf(p)) {\n        await $.store.set(`size.${data.id}`, data.value);\n        $.ui.invalidate(\"ui.render\");\n      }\n    } else if (isClearMessage(data) && data.id === \"agents\") {",
+    "new": "      const p = idx.get(data.id)!;\n      if (stagesOf(p)) {\n        const current = ((await $.store.get(`size.${data.id}`)) as Stage | undefined) ?? p.defaultStage ?? \"compact\";\n        await $.store.set(`size.${data.id}`, nextStage(current));\n        $.ui.invalidate(\"ui.render\");\n      }\n    } else if (isClearMessage(data) && data.id === \"agents\") {"
+  }
+]

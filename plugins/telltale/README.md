@@ -52,7 +52,7 @@ v0.2 adds a sub-vocabulary for the `agents` panel:
 
 | Input | Output |
 |---|---|
-| `/telltale agents style`, `agents style v1\|v2\|v4` | `agents style: v2` / `agents style: v2 → v1`; same value replies `(unchanged)` |
+| `/telltale agents style`, `agents style auto\|v1\|v2\|v4` | `agents style: auto` (the default — follows placement) / `agents style: auto → v1`; same value replies `(unchanged)` |
 | `/telltale agents edge`, `agents edge right\|bottom` | Same format; a value the engine doesn't have replies `edge top: not available in this build` |
 | `/telltale agents size`, `agents size summary\|compact\|full` | Same format, backed by the `size.agents` store key |
 | `/telltale agents clear` | Dismisses every failed/killed cell and every orphan lane: `agents: cleared 2` |
@@ -82,7 +82,10 @@ Cells render in one of three styles, switched with `/telltale agents style`:
 top/bottom), `v2` (a vertical list of steps inside one framed box, for a
 narrow-but-tall panel docked left/right — the default when the `Pane` is
 side-docked), `v4` (both the header and the steps squeezed onto one chained
-line, for when there's only 2–3 rows of height). Where the panel is drawn is
+line, for when there's only 2–3 rows of height). The default is `auto` — `v2`
+when the `Pane` is docked, `v1` when it sits above the prompt; setting a
+concrete style (by command or by the title-row buttons below) overrides that
+until you set it back to `auto`. Where the panel is drawn is
 not a product choice — the
 engine only offers two positions for a `Client`-drawn `Pane`: docked to the
 right edge of a wide-enough terminal, or floating in a boxed panel just above
@@ -117,6 +120,10 @@ label telltale attaches to each cell (read from the spawn call, not from
 notification turns yellow (long-running, still counted as running); past
 `2 h` it becomes an **orphan** (`?`, yellow) and stays on screen — nothing
 auto-dismisses it — until you click it or run `/telltale agents clear`.
+
+**Clicks.** The `agents` title row carries `[1 2 3] [S C F] [x]` — style
+v1/v2/v4, size summary/compact/full, clear — the active one bold; hidden
+when the row is too narrow.
 
 **Why `$.ui.open` shows up in `calls:` below.** `$.ui.*` only ever draws;
 `open`/`close` control whether the `Pane` surface is visible at all, so
