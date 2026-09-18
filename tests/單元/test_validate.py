@@ -24,7 +24,7 @@ from pathlib import Path
     "$.store.delete",
     "$.env.get",
     "$.ui.open",
-    "$.ui.close (via applyEdge)",
+    "$.ui.close (via applyEdge)",  # validate names the helper the call sits in (register.tsx applyEdge)
 }
 
 

@@ -56,7 +56,7 @@
 
 ## 4. 面板貼哪一邊、開合
 
-- 設計上四邊（top／bottom／left／right）都要能貼，各自收合；**2.1.274 引擎只給兩個位置**：`Pane`（寬時右側 dock）與窄時自動落到輸入框上方。v0.2 實作這兩個，`/telltale agents edge` 只接受引擎有的值，其他回 `not available in this build`。
+- 設計上四邊（top／bottom／left／right）都要能貼，各自收合；**2.1.274 引擎只給兩個位置**：`Pane`（寬時右側 dock）與窄時自動落到輸入框上方。v0.2 實作這兩個，`/telltale agents edge` 只接受引擎有的值，其他回 `not available in this build`。 **v0.2b（票 27）改成三態 `right／bottom／both`，真的 open／close Pane；定義在 SDD §2.8。**
 - 開合大小由引擎管（Pane 的寬／高、AbovePrompt 的 `maxRows`）；面板內用三段 `size`（summary＝只有標題列、compact＝每 cell 收合、full＝全展）在引擎給的範圍內切。
 - 樣式預設：貼側邊→v2，貼上下→v1，可用 `/telltale agents style` 覆蓋，存 `$.store`。
 
