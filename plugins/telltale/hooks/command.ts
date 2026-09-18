@@ -5,7 +5,7 @@ import { STAGE_ORDER, type Stage } from "./layout";
 import type { Cell } from "./cells";
 
 export type AgentsView = {
-  style: "v1" | "v2" | "v4";
+  style: "auto" | "v1" | "v2" | "v4";
   edge: "right" | "bottom";
   size: "summary" | "compact" | "full";
   cells: Record<string, Cell>;
@@ -111,9 +111,17 @@ const sizeSet = (id: string, to: Stage, state: TelltaleState): TelltaleResult =>
 
 // SDD §1.6 v0.2 table. `agents style|edge|size` report or set one of the
 // three `*.agents` store keys; `agents clear` drops dismissable cells.
-const AGENTS_STYLES = ["v1", "v2", "v4"] as const;
+// v0.2b (票 24): "auto" is a settable value too — `agents style auto` puts
+// the effective style back under placement's control (register.tsx).
+const AGENTS_STYLES = ["auto", "v1", "v2", "v4"] as const;
 const AGENTS_SIZES = ["summary", "compact", "full"] as const;
 const CLEARABLE = new Set(["failed", "killed", "orphan"]);
+
+// Ticket 24: the same filter backs both `/telltale agents clear` (below)
+// and the title-row `[x]` button's `ui.message` handler (register.tsx) —
+// one piece of knowledge, so it's exported instead of copied.
+export const clearDismissable = (cells: Record<string, Cell>): Record<string, Cell> =>
+  Object.fromEntries(Object.entries(cells).filter(([, c]) => !CLEARABLE.has(c.status)));
 
 const agentsSet = (key: string, label: string, from: string, to: string, state: TelltaleState): TelltaleResult => {
   if (from === to) return { text: `agents ${label}: ${from} (unchanged)`, panels: state.panels, sizes: state.sizes };
@@ -121,7 +129,7 @@ const agentsSet = (key: string, label: string, from: string, to: string, state: 
 };
 
 const agentsClear = (cells: Record<string, Cell>, state: TelltaleState): TelltaleResult => {
-  const kept = Object.fromEntries(Object.entries(cells).filter(([, c]) => !CLEARABLE.has(c.status)));
+  const kept = clearDismissable(cells);
   const removed = Object.keys(cells).length - Object.keys(kept).length;
   const text = `agents: cleared ${removed}`;
   if (removed === 0) return { text, panels: state.panels, sizes: state.sizes };

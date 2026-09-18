@@ -1,11 +1,11 @@
 // Ticket 06: the band's surface module. SDD §1.5. Runs on the drawing thread;
 // no `claude-code` value import beyond types, no `$`. Click handling is
-// tested indirectly through the pure functions in `hit.ts` (hitPanel/isClick/
-// rowsOf); this file's own output has no automated test (SDD §1.5), the tmux
-// script in the ticket covers it.
+// tested indirectly through the pure functions in `hit.ts` (resolveTitleClick/
+// isClick/rowsOf, ticket 24 adds buttonStrip); this file's own output has no
+// automated test (SDD §1.5), the tmux script in the ticket covers it.
 
 import type { ClientSurface } from "claude-code";
-import { hitCell, hitPanel, isClick, rowsOf, TITLE_RESERVE, type CellRowSpan } from "./hit";
+import { hitCell, isClick, resolveTitleClick, rowsOf, TITLE_RESERVE, buttonStrip, type CellRowSpan } from "./hit";
 import type { BandPanel, BandProps } from "./hit";
 import { MIN_COLUMNS } from "./layout";
 import type { Tone } from "./panel";
@@ -62,6 +62,55 @@ const panelTitleLine = (label: string, columns: number): string => {
   return head + DASH.repeat(columns - headWidth);
 };
 
+// Ticket 24: the first `width` display columns of `s` — same walk `fit`
+// (width.ts) does, minus the ellipsis; `width.ts` is read-only for this
+// ticket (00-共同規則) so this stays local rather than becoming a new export
+// there. Only ever called with `width = strip.x0 <= columns`, so it never
+// needs to truncate mid-run wider than the source string.
+const sliceByWidth = (s: string, width: number): string => {
+  let w = 0;
+  let result = "";
+  for (const ch of s) {
+    const cw = displayWidth(ch);
+    if (w + cw > width) break;
+    w += cw;
+    result += ch;
+  }
+  return result;
+};
+
+// Ticket 24 (SDD §2.8): turns a `ButtonStrip` (hit.ts, the sole coordinate
+// source shared with hit-testing) into what this title row actually draws —
+// the panel's own head/dashes up to `strip.x0` untouched, then the button
+// glyphs themselves colored (active = bold white, inactive = grey, the
+// brackets/separating spaces = greyDeep — SDD §2.8's own tone list), then
+// dash-fill from the strip's end out to `columns`.
+const buttonTitleRow = (strip: ButtonStrip, label: string, columns: number): TitleButtonRow => {
+  const prefix = sliceByWidth(panelTitleLine(label, columns), strip.x0);
+
+  const activeAt = new Map<number, boolean>();
+  for (const span of strip.spans) {
+    const w = displayWidth(span.text);
+    for (let i = 0; i < w; i += 1) activeAt.set(span.x0 + i, span.active);
+  }
+
+  const spans: Span2[] = [];
+  for (let i = 0; i < strip.text.length; i += 1) {
+    const ch = strip.text[i]!;
+    const active = activeAt.get(strip.x0 + i);
+    const tone2: Tone2 = active === undefined ? "greyDeep" : active ? "white" : "grey";
+    const last = spans.at(-1);
+    if (last && last.tone2 === tone2) {
+      last.text += ch;
+    } else {
+      spans.push({ text: ch, tone2 });
+    }
+  }
+
+  const suffix = DASH.repeat(Math.max(0, columns - (strip.x0 + displayWidth(strip.text))));
+  return { prefix, spans, suffix };
+};
+
 // dropped > error (SDD §1.5, ticket 23: the row only exists when one of
 // these applies — `props.status` gates whether this is even called for the
 // last row; called defensively with neither, it draws nothing).
@@ -77,7 +126,12 @@ const statusLine = (props: BandProps, columns: number): string => {
 };
 
 type Span2 = { text: string; tone2: Tone2 };
-type Row = { text: string; tone?: Tone } | { spans: Span2[] };
+// Ticket 24: a panel title row that carries a button strip — the plain
+// head/dash-fill parts keep the panel title's ordinary (untoned) color,
+// only the button glyphs themselves get tone2 colors, so this can't reuse
+// the plain `{ spans: Span2[] }` variant (which has no "default color" tone2).
+type TitleButtonRow = { prefix: string; spans: Span2[]; suffix: string };
+type Row = { text: string; tone?: Tone } | { spans: Span2[] } | { titleButtons: TitleButtonRow };
 
 // DESIGN §2 palette, keyed by `Tone2` (`hooks/cells.ts`). "current"/
 // "currentFailed" additionally set `backgroundColor` (DESIGN §6 item 2:
@@ -155,7 +209,11 @@ const buildRows = (
   let nextCam: Record<string, CameraState> = {};
   for (const panel of props.panels) {
     const titleY = titleRowOf[panel.id];
-    rows[titleY] = { text: panelTitleLine(panel.label, columns) };
+    // Ticket 24: a panel with `buttons` draws the strip when it fits
+    // (`buttonStrip` returns null on a too-narrow row — SDD §2.8: draw the
+    // whole strip or none of it), otherwise this title row is unchanged.
+    const strip = panel.buttons ? buttonStrip(panel.id, panel.buttons, panel.label, columns) : null;
+    rows[titleY] = strip ? { titleButtons: buttonTitleRow(strip, panel.label, columns) } : { text: panelTitleLine(panel.label, columns) };
     const cellsPanel = cellsOf(panel);
     if (cellsPanel) {
       const built = buildCellRows(cellsPanel, columns, panel.rows, now, frame, camState);
@@ -236,9 +294,13 @@ export function Band(props: BandProps, surface: ClientSurface<BandState>) {
     if (ev.type !== "up") return;
     const down = surface.state?.down ?? null;
     if (isClick(down, ev)) {
-      const id = hitPanel(ev.y, ev.x, props, columns);
-      if (id) {
-        surface.post({ kind: "toggle", id });
+      // Ticket 24: `resolveTitleClick` is the single dispatch point for a
+      // title-row hit — a button span's own message, or the pre-existing
+      // stage/toggle fallback; `hitPanel`/`titleClickKind` stay inside it,
+      // not called directly here any more.
+      const t = resolveTitleClick(ev.y, ev.x, props, columns);
+      if (t !== null) {
+        surface.post(t);
       } else {
         const cellsAt = buildRows(props, columns, Date.now(), surface.state?.frame ?? 0, surface.state?.cam ?? {}).cellSpans;
         for (const [panelId, entry] of Object.entries(cellsAt)) {
@@ -293,6 +355,23 @@ export function Band(props: BandProps, surface: ClientSurface<BandState>) {
   return (
     <Box flexDirection="column">
       {rows.map((row) => {
+        if ("titleButtons" in row) {
+          const { prefix, spans, suffix } = row.titleButtons;
+          return (
+            <Box>
+              <Text>{prefix}</Text>
+              {spans.map((span) => {
+                const tp = tone2Props(span.tone2);
+                return (
+                  <Text color={tp.color} backgroundColor={tp.backgroundColor} bold={tp.bold}>
+                    {span.text}
+                  </Text>
+                );
+              })}
+              <Text>{suffix}</Text>
+            </Box>
+          );
+        }
         if ("spans" in row) {
           return (
             <Box>

@@ -4,7 +4,7 @@
 // $.agent.list, $.env.get.
 
 import type { On, PluginOptions, Register } from "claude-code";
-import { runTelltale, type AgentsView, type TelltaleState } from "./command";
+import { clearDismissable, runTelltale, type AgentsView, type TelltaleState } from "./command";
 import { BAND_ROWS_MAX, layout, MIN_COLUMNS, nextStage, rowsForStage, type Stage, type Stages } from "./layout";
 import type { BandPanel, BandProps } from "./hit";
 import type { Panel } from "./panel";
@@ -49,6 +49,33 @@ const isRowMessage = (data: unknown): data is RowMessage =>
   typeof (data as { id?: unknown }).id === "string" &&
   typeof (data as { hit?: unknown }).hit === "string";
 
+// Ticket 24 (SDD §2.8): the title-row buttons' own three message kinds —
+// same store keys `/telltale agents style|size` and `agents clear` already
+// write (票 11's "按鍵與指令寫同一個鍵" rule), just reached by a click.
+type StyleMessage = { kind: "style"; id: string; value: "v1" | "v2" | "v4" };
+type SizeMessage = { kind: "size"; id: string; value: Stage };
+type ClearMessage = { kind: "clear"; id: string };
+
+const isStyleMessage = (data: unknown): data is StyleMessage =>
+  typeof data === "object" &&
+  data !== null &&
+  (data as { kind?: unknown }).kind === "style" &&
+  typeof (data as { id?: unknown }).id === "string" &&
+  typeof (data as { value?: unknown }).value === "string";
+
+const isSizeMessage = (data: unknown): data is SizeMessage =>
+  typeof data === "object" &&
+  data !== null &&
+  (data as { kind?: unknown }).kind === "size" &&
+  typeof (data as { id?: unknown }).id === "string" &&
+  typeof (data as { value?: unknown }).value === "string";
+
+const isClearMessage = (data: unknown): data is ClearMessage =>
+  typeof data === "object" &&
+  data !== null &&
+  (data as { kind?: unknown }).kind === "clear" &&
+  typeof (data as { id?: unknown }).id === "string";
+
 const stagesOf = (p: Panel): Stages | undefined => p.stages;
 
 // Ticket 23: whether any active panel is currently erroring — read before
@@ -78,7 +105,13 @@ async function anyPanelErroring(active: readonly Panel[], $: any): Promise<boole
 // touches, plus there's no `tsc` step in this repo's checks — see
 // 00-共同規則); left as `any` rather than re-deriving a shared alias.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function buildBandProps(active: readonly Panel[], $: any, maxRows: number, viewportColumns: number | undefined): Promise<BandProps> {
+async function buildBandProps(
+  active: readonly Panel[],
+  $: any,
+  maxRows: number,
+  viewportColumns: number | undefined,
+  placement: "dock" | "inline",
+): Promise<BandProps> {
   const byId = new Map(active.map((p) => [p.id, p] as const));
   const panelsState = ((await $.store.get("panels")) as Record<string, boolean> | undefined) ?? {};
   const wants = await Promise.all(
@@ -109,7 +142,12 @@ async function buildBandProps(active: readonly Panel[], $: any, maxRows: number,
       // shared `data.<id>` cache.
       if (p.id === "agents") {
         const cells = ((await $.store.get("agents.cells")) as Record<string, import("./cells").Cell> | undefined) ?? {};
-        const style = ((await $.store.get("style.agents")) as "v1" | "v2" | "v4" | undefined) ?? "v1";
+        // Ticket 24 / SDD §2.8 "樣式預設依 placement": a stored v1/v2/v4
+        // wins outright; unset or the literal "auto" falls back to what
+        // the placement implies (DESIGN §4: dock -> v2, inline -> v1).
+        const storedStyle = (await $.store.get("style.agents")) as "auto" | "v1" | "v2" | "v4" | undefined;
+        const style = storedStyle !== undefined && storedStyle !== "auto" ? storedStyle : placement === "dock" ? "v2" : "v1";
+        const size = ((await $.store.get(`size.${p.id}`)) as Stage | undefined) ?? p.defaultStage ?? "compact";
         const view = p.view(cells, columnsForView, slot.rows) as { kind?: string; cells?: unknown };
         return {
           id: p.id,
@@ -117,6 +155,7 @@ async function buildBandProps(active: readonly Panel[], $: any, maxRows: number,
           rows: slot.rows,
           lines: [],
           ...(view.kind === "cells" ? { cells: view.cells, style } : {}),
+          buttons: { style, size },
           at: null,
           error: error === "" ? null : error,
           stages: Boolean(stagesOf(p)),
@@ -266,7 +305,7 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
     if (e.props.hasSurvey) return next(e);
 
     const viewportColumns = (e.viewport as { columns?: number } | undefined)?.columns;
-    const props = await buildBandProps(active, $, e.props.maxRows as number, viewportColumns);
+    const props = await buildBandProps(active, $, e.props.maxRows as number, viewportColumns, "inline");
 
     const { Client } = $.ui.resolve(e);
     return <Client key="band" module="./band.tsx" props={props} />;
@@ -282,7 +321,11 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
   // ceiling `command.run` already uses when it has no live viewport either.
   on("ui.render", { component: "Pane" }, async ($, e) => {
     const viewportColumns = (e.viewport as { columns?: number } | undefined)?.columns;
-    const props = await buildBandProps(active, $, BAND_ROWS_MAX, viewportColumns);
+    // Ticket 24: `Pane.placement` (claude-code.d.ts, 2.1.274) — `"dock"` on
+    // a wide-enough terminal, `"inline"` when the engine floats it above
+    // the prompt instead; drives the placement-derived style default.
+    const placement = ((e.props as { placement?: "dock" | "inline" } | undefined)?.placement ?? "dock") as "dock" | "inline";
+    const props = await buildBandProps(active, $, BAND_ROWS_MAX, viewportColumns, placement);
 
     const { Client } = $.ui.resolve(e);
     return <Client key="band" module="./band.tsx" props={props} />;
@@ -310,6 +353,24 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
         await $.store.set(`size.${data.id}`, toStage);
         $.ui.invalidate("ui.render");
       }
+    } else if (isStyleMessage(data)) {
+      // Ticket 24: the `[1 2 3]` button group — writes the same key
+      // `/telltale agents style` writes, no cycle (always the clicked value).
+      await $.store.set("style.agents", data.value);
+      $.ui.invalidate("ui.render");
+    } else if (isSizeMessage(data) && idx.has(data.id)) {
+      // Ticket 24: the `[S C F]` button group — sets the stage directly
+      // (unlike `stage`'s cycle above); ignored on a panel without stages.
+      const p = idx.get(data.id)!;
+      if (stagesOf(p)) {
+        await $.store.set(`size.${data.id}`, data.value);
+        $.ui.invalidate("ui.render");
+      }
+    } else if (isClearMessage(data) && data.id === "agents") {
+      // Ticket 24: the `[x]` button — same filter as `/telltale agents clear`.
+      const cells = ((await $.store.get("agents.cells")) as Cells | undefined) ?? {};
+      await $.store.set("agents.cells", clearDismissable(cells));
+      $.ui.invalidate("ui.render");
     } else if (isRowMessage(data) && data.id === "agents") {
       // Ticket 17 (SDD §2.6 "onRow"): a cell click, dispatched to the
       // agents panel's own pure `onRow` — this hook only reads/writes the
@@ -349,7 +410,11 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
     const agentsPanel = active.find((p) => p.id === "agents");
     const agentsView: AgentsView | undefined = agentsPanel
       ? {
-          style: ((await $.store.get("style.agents")) as AgentsView["style"] | undefined) ?? "v2",
+          // Ticket 24: `command.run` has no live viewport/placement to
+          // resolve "auto" against, so it just reports the stored value
+          // (or "auto" itself when nothing's stored) — matching what
+          // `/telltale agents style` with no args should say (SDD §2.8).
+          style: ((await $.store.get("style.agents")) as AgentsView["style"] | undefined) ?? "auto",
           edge: ((await $.store.get("edge.agents")) as AgentsView["edge"] | undefined) ?? "right",
           size: ((await $.store.get("size.agents")) as AgentsView["size"] | undefined) ?? agentsPanel.defaultStage ?? "compact",
           cells: ((await $.store.get("agents.cells")) as Cells | undefined) ?? {},
