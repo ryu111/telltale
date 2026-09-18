@@ -31,6 +31,8 @@ claude plugin validate --strict .      # 根目錄是 marketplace（.claude-plug
 - `claude plugin test` 在 2.1.267 **不存在**（帶 `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` 也沒有；`plugin --help` 只有 validate／eval／init 等）。題目 DoD #2 改成自建 harness。2026-09-17 查：npm latest 是 2.1.274 但 native installer 的 stable channel 停在 2.1.267，`claude update` 不會升。
 - `which claude` 指到 cmux 的 shim（bash script），要 grep 真 binary 看 `~/.local/share/claude/versions/<ver>`。
 - function hooks 相關字串（`AbovePrompt`、`bodyColumns`、`onPointer`、`hooks module`）在 2.1.267 binary 裡都有，機制存在，只是被旗標關著。
+- 2026-09-18：**Claude Desktop 內建的 2.1.266（stream-json headless）也會載入這個 plugin**（skills-dir symlink＋settings env），它的 `$.agent.list` 一律丟 `not available in this mode: no session is bound`，而且 store 檔是同一個 plugin 所有 session 共用（`~/.claude/plugins/store/telltale_<provenance>.json`）——Desktop 的 4 個 session 每秒寫錯誤與 cell，終端機那條帶子讀到就顯示。票 26 起 `e.isInteractive === false` 整個不動、live 鍵按 `$.session.id()` 分（SDD §2.8）。舊 store 檔裡 v0.2 留下的裸 `agents.cells`／`error.agents` 沒人讀也沒人清。
+- macOS 沒有 `timeout`（coreutils 的）；真機腳本要等 claude 就用 `python3 -c "import time;time.sleep(N)"`（前景 `sleep` 被 hook 擋）。
 
 ## Agent skills
 
