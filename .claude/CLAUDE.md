@@ -52,4 +52,4 @@ Single-context：根目錄 `CONTEXT.md` ＋ `docs/adr/`（缺就略過，由 dom
 
 ## Graphify（每個專案都要有自己的圖，2026-09-18）
 - 問「哪裡呼叫 X」「A 到 B 怎麼接」「這個模組跟誰有關」：先 `graphify query "<問題>" --budget 800`／`graphify explain "<節點>"`／`graphify path "A" "B"`，再讀檔。派工 brief 開頭也給子代理一條 `graphify explain`。
-- `graphify-out/graph.json` 與 `GRAPH_REPORT.md` 進 git；post-commit hook 每次 commit 純 AST 重建（不花 token）。docs/ 改很多才 `/graphify . --update`（那才花 token）。
+- `graphify-out/` 不進 git（hook 每次重建內容都不同，會一直髒）；SessionStart hook 沒圖就自動建、post-commit hook 每次 commit 純 AST 重建，都不花 token。docs/ 改很多才 `/graphify . --update`（那才花 token）。
