@@ -80,6 +80,7 @@ test("a stored 'auto' behaves exactly like nothing stored", async () => {
 test("an explicit 'right' (ticket 30) also draws above the prompt until the Pane renders, then yields", async () => {
   const eng = await boot({ "edge.agents": "right" });
   expect(eng.opened).toEqual(["telltale"]);
+  expect(await eng.fire("command.run", { command: "telltale", args: "agents edge" })).toEqual({ text: "agents edge: right" }); // stored, not the effective value
   expect(panelIds(await renderAbove(eng))).toEqual(["agents", "hello"]);
   await renderPane(eng);
   expect(await renderAbove(eng)).toEqual(eng.NEXT_RENDER);
