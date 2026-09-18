@@ -1,0 +1,8 @@
+[
+  {
+    "label": "explicit right never falls back",
+    "file": "plugins/telltale/hooks/command.ts",
+    "old": "  if (stored === \"bottom\" || stored === \"both\") return stored;",
+    "new": "  if (stored === \"right\" || stored === \"bottom\" || stored === \"both\") return stored;"
+  }
+]

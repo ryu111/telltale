@@ -14,18 +14,20 @@ export type AgentsView = {
   cells: Record<string, Cell>;
 };
 
-// Ticket 29 (SDD §2.8 "換邊 auto 退路"): the one place that turns a *stored*
-// edge value plus "has the Pane's `ui.render` ever actually reached this
-// session" into the value every render site and the title-row buttons act
-// on. `stored` right/bottom/both always win outright (an explicit choice is
-// never second-guessed by `paneSeen`); no value stored, or the literal
-// "auto", falls back to whether the Pane has shown up yet — `bottom` (draw
-// above the prompt) until it has, `right` once it has.
+// Ticket 29 (SDD §2.8 "換邊 auto 退路"), ticket 30 (SDD §2.8 "right 也走退路"):
+// the one place that turns a *stored* edge value plus "has the Pane's
+// `ui.render` ever actually reached this session" into the value every
+// render site and the title-row buttons act on. `stored` bottom/both always
+// win outright (an explicit choice never second-guessed by `paneSeen`);
+// everything else — no value stored, the literal "auto", or an explicit
+// "right" — falls back to whether the Pane has shown up yet — `bottom`
+// (draw above the prompt) until it has, `right` once it has. `right` and
+// `auto` now differ only in whether the value is *stored*, not in behavior.
 export const effectiveEdge = (
   stored: "auto" | "right" | "bottom" | "both" | undefined,
   paneSeen: boolean,
 ): "right" | "bottom" | "both" => {
-  if (stored === "right" || stored === "bottom" || stored === "both") return stored;
+  if (stored === "bottom" || stored === "both") return stored;
   return paneSeen ? "right" : "bottom";
 };
 
