@@ -159,7 +159,7 @@ test("default style follows placement: AbovePrompt/inline -> v1, docked Pane -> 
   const eng = await boot();
   const above = agentsOf(await renderAbove(eng));
   expect(above.style).toBe("v1");
-  expect(above.buttons).toEqual({ style: "v1", size: "full" });
+  expect(above.buttons).toEqual({ style: "v1", size: "full", edge: "right" });
   const docked = agentsOf(await renderPane(eng, "dock"));
   expect(docked.style).toBe("v2");
   expect(docked.buttons!.style).toBe("v2");
