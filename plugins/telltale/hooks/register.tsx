@@ -216,13 +216,18 @@ async function buildBandProps(
         // has actually rendered, `right` after.
         const storedEdge = (await $.store.get("edge.agents")) as "auto" | "right" | "bottom" | "both" | undefined;
         const edge = effectiveEdge(storedEdge, paneSeen);
+        // Ticket 31 (SDD §2.8): the click state onRow wrote (register.tsx's
+        // `ui.message` "row" branch, ticket 17) has to reach the Client the
+        // same way `cells`/`style` do — `null`, not `undefined`, when
+        // nothing's stored (the engine rejects an undefined prop).
+        const expanded = ((await $.store.get(liveKey("agents.expanded"))) as import("./cells").Expanded | undefined) ?? null;
         const view = p.view(cells, columnsForView, slot.rows) as { kind?: string; cells?: unknown };
         return {
           id: p.id,
           label: p.label,
           rows: slot.rows,
           lines: [],
-          ...(view.kind === "cells" ? { cells: view.cells, style } : {}),
+          ...(view.kind === "cells" ? { cells: view.cells, style, expanded } : {}),
           buttons: { style, size, edge },
           at: null,
           error: error === "" ? null : error,

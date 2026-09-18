@@ -3,7 +3,7 @@
 
 import { CONTENT_ROWS_MAX } from "../layout";
 import type { Panel } from "../panel";
-import { compressSteps, VANISH_AFTER_MS, COLLAPSE_AFTER_MS, ORPHAN_MS, MAIN_HISTORY_ID, type Cell, type Step } from "../cells";
+import { compressSteps, VANISH_AFTER_MS, COLLAPSE_AFTER_MS, ORPHAN_MS, MAIN_HISTORY_ID, EXPANDED_MS, type Cell, type Step } from "../cells";
 import type { PendingSpawn } from "../observe";
 
 // Ticket 21: the id lives in cells.ts so renderCell (also in cells.ts) can
@@ -187,9 +187,10 @@ export const agents: Panel<Cells> = {
 
 export type OnRowResult = { cells: Cells; expanded: { id: string; at: number } | null };
 
-// Click-to-expand window: past this age, the Client treats `expanded` as
-// stale on its own (no `$.clock.every` needed just to null it back out).
-export const EXPANDED_MS = 10_000;
+// Ticket 31: sole source of truth moved to cells.ts (renderCell/isCollapsed
+// need it too); re-exported here so this module's existing callers/tests
+// don't have to change their import path.
+export { EXPANDED_MS };
 
 export const onRow = (hit: string, cells: Cells, now: number): OnRowResult => {
   const cell = cells[hit];
