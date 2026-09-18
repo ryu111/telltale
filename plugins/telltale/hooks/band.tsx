@@ -176,6 +176,7 @@ const buildCellRows = (
   now: number,
   frame: number,
   camState: Record<string, CameraState>,
+  forceCollapsed: boolean,
 ): { rows: Row[]; spans: CellRowSpan[]; nextCam: Record<string, CameraState> } => {
   const rows: Row[] = [];
   const spans: CellRowSpan[] = [];
@@ -185,7 +186,7 @@ const buildCellRows = (
     if (remaining <= 0) break;
     const cam = camState[cell.id] ?? { offset: 0 };
     const h = Math.min(remaining, cellsPanel.style === "v2" ? panelRows : cellsPanel.style === "v4" ? 2 : 4);
-    const { lines, cam: updatedCam } = renderCell(cell, cellsPanel.style ?? "v1", columns, h, now, frame, cam, cellsPanel.expanded ?? null);
+    const { lines, cam: updatedCam } = renderCell(cell, cellsPanel.style ?? "v1", columns, h, now, frame, cam, cellsPanel.expanded ?? null, forceCollapsed);
     nextCam[cell.id] = updatedCam;
     for (const line of lines) {
       rows.push({ spans: line.spans.map((s) => ({ text: s.text, tone2: s.tone })) });
@@ -221,7 +222,12 @@ const buildRows = (
     rows[titleY] = strip ? { titleButtons: buttonTitleRow(strip, panel.label, columns) } : { text: panelTitleLine(panel.label, columns) };
     const cellsPanel = cellsOf(panel);
     if (cellsPanel) {
-      const built = buildCellRows(cellsPanel, columns, panel.rows, now, frame, camState);
+      // Ticket 32 (SDD §2.8): a `compact`-stage panel forces every cell to
+      // its one-row collapsed form — `panel.buttons.size` (ticket 24) is
+      // the one field register.tsx already threads through for this, so no
+      // new `BandPanel` field is added here.
+      const forceCollapsed = panel.buttons?.size === "compact";
+      const built = buildCellRows(cellsPanel, columns, panel.rows, now, frame, camState, forceCollapsed);
       for (let i = 0; i < panel.rows; i += 1) rows[titleY + 1 + i] = built.rows[i] ?? { text: "" };
       cellSpans[panel.id] = { startY: titleY + 1, spans: built.spans };
       nextCam = { ...nextCam, ...built.nextCam };

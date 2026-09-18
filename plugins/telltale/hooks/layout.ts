@@ -20,14 +20,14 @@ export type Stages = { summary: 0; compact: number; full: "rest" };
 export const STAGE_ORDER: readonly Stage[] = ["summary", "compact", "full"];
 export const nextStage = (stage: Stage): Stage =>
   STAGE_ORDER[(STAGE_ORDER.indexOf(stage) + 1) % STAGE_ORDER.length]!;
-export const rowsForStage = (stage: Stage): { minRows: number; wantRows: number } => {
+export const rowsForStage = (stage: Stage, cap: number = BAND_ROWS_MAX): { minRows: number; wantRows: number } => {
   switch (stage) {
     case "summary":
       return { minRows: 0, wantRows: 0 };
     case "compact":
       return { minRows: 2, wantRows: 3 };
     case "full":
-      return { minRows: 3, wantRows: CONTENT_ROWS_MAX };
+      return { minRows: 3, wantRows: cap - TITLE_ROWS };
   }
 };
 
@@ -38,16 +38,17 @@ const computeWithFixed = (
   panels: readonly Want[],
   maxRows: number,
   fixed: number,
+  cap: number,
 ): { slots: Slot[]; dropped: string[]; total: number } => {
   // Rule 1: budget is computed once — a constant, never re-judged as rows get allocated.
-  const budget = Math.min(maxRows, BAND_ROWS_MAX) - fixed;
+  const budget = Math.min(maxRows, cap) - fixed;
 
   if (budget < 1) {
     // Rule 2: everything is dropped whole; only the fixed rows remain (collapsed to 1 if maxRows <= fixed).
     return {
       slots: [],
       dropped: panels.map((p) => p.id),
-      total: Math.max(1, Math.min(maxRows, fixed)),
+      total: Math.max(1, Math.min(maxRows, cap, fixed)),
     };
   }
 
@@ -91,21 +92,22 @@ const computeWithFixed = (
 // actually dropped something — again with the status row's row reserved
 // (fixed = FIXED_ROWS), since dropping needs the status row to say what got
 // dropped.
-export const layout = (panels: readonly Want[], maxRows: number, opts?: { status?: boolean }): Layout => {
+export const layout = (panels: readonly Want[], maxRows: number, opts?: { status?: boolean; cap?: number }): Layout => {
   if (panels.length === 0) {
     return { slots: [], dropped: [], total: 1, status: false };
   }
+  const cap = opts?.cap ?? BAND_ROWS_MAX;
 
   if (opts?.status === true) {
-    const r = computeWithFixed(panels, maxRows, FIXED_ROWS);
+    const r = computeWithFixed(panels, maxRows, FIXED_ROWS, cap);
     return { ...r, status: true };
   }
 
-  const first = computeWithFixed(panels, maxRows, TITLE_ROWS);
+  const first = computeWithFixed(panels, maxRows, TITLE_ROWS, cap);
   if (first.dropped.length === 0) {
     return { ...first, status: false };
   }
 
-  const second = computeWithFixed(panels, maxRows, FIXED_ROWS);
+  const second = computeWithFixed(panels, maxRows, FIXED_ROWS, cap);
   return { ...second, status: true };
 };
