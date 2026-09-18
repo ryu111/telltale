@@ -108,7 +108,7 @@ export const buttonStrip = (id: string, buttons: TitleButtons, label: string, co
     let offset = cursor + 1; // skip the group's opening "["
     for (const btn of group) {
       const w = displayWidth(btn.text);
-      spans.push({ x0: offset, x1: offset + 1, text: btn.text, active: btn.active, message: btn.message });
+      spans.push({ x0: offset, x1: offset + w, text: btn.text, active: btn.active, message: btn.message });
       offset += w + 1; // the button text, then the following " " or "]"
     }
     cursor += displayWidth(`[${group.map((b) => b.text).join(" ")}]`) + 1; // +1: the space before the next group

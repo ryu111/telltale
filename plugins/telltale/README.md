@@ -53,7 +53,7 @@ v0.2 adds a sub-vocabulary for the `agents` panel:
 | Input | Output |
 |---|---|
 | `/telltale agents style`, `agents style auto\|v1\|v2\|v4` | `agents style: auto` (the default — follows placement) / `agents style: auto → v1`; same value replies `(unchanged)` |
-| `/telltale agents edge`, `agents edge right\|bottom` | Same format; a value the engine doesn't have replies `edge top: not available in this build` |
+| `/telltale agents edge`, `agents edge right\|bottom\|both` | Same format (`right` when nothing is stored); a value the engine doesn't have replies `edge top: not available in this build` |
 | `/telltale agents size`, `agents size summary\|compact\|full` | Same format, backed by the `size.agents` store key |
 | `/telltale agents clear` | Dismisses every failed/killed cell and every orphan lane: `agents: cleared 2` |
 | `/telltale status` | Now prints an extra segment per panel: `● agents  on   compact  3 rows` |
@@ -64,7 +64,7 @@ Pasted verbatim from `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin validate
 
 ```text
 register.tsx hooks: session.start, ui.render{component=AbovePrompt}, ui.render{component=Pane}, ui.message, command.run{command=telltale}, turn.start, turn.step, turn.complete, ui.render{component=Spinner}, session.receive{origin has {kind=task-notification}}
-register.tsx calls: $.agent.list, $.clock.every, $.clock.now, $.command.register, $.env.get, $.session.id, $.store.delete, $.store.get, $.store.keys, $.store.set, $.ui.invalidate, $.ui.open, $.ui.resolve
+register.tsx calls: $.agent.list, $.clock.every, $.clock.now, $.command.register, $.env.get, $.session.id, $.store.delete, $.store.get, $.store.keys, $.store.set, $.ui.close (via applyEdge), $.ui.invalidate, $.ui.open, $.ui.resolve
 ```
 
 ## The `agents` panel
@@ -85,14 +85,15 @@ side-docked), `v4` (both the header and the steps squeezed onto one chained
 line, for when there's only 2–3 rows of height). The default is `auto` — `v2`
 when the `Pane` is docked, `v1` when it sits above the prompt; setting a
 concrete style (by command or by the title-row buttons below) overrides that
-until you set it back to `auto`. Where the panel is drawn is
-not a product choice — the
-engine only offers two positions for a `Client`-drawn `Pane`: docked to the
-right edge of a wide-enough terminal, or floating in a boxed panel just above
-the input on a narrow one. The v0.2 design draft sketched all four screen
-edges; `/telltale agents edge` only accepts the two the engine actually
-supports (`right`, `bottom`) and answers `not available in this build` for
-the rest — that's an engine limitation, not telltale giving up on the idea.
+until you set it back to `auto`. `/telltale agents edge` (or the title-row
+`[R B RB]` buttons) switches where `agents` draws, three ways: `right` (the
+default — a `Pane`; the engine docks it beside the transcript from ~110
+columns and drops it above the prompt when narrower), `bottom` (the
+AbovePrompt band only — no `Pane`), `both` (`agents` stays in the `Pane`,
+every other panel moves to the AbovePrompt band instead). The v0.2 design
+draft sketched all four screen edges; `top`/`left` are not positions the
+engine offers, so those answer `not available in this build` — that's an
+engine limitation, not telltale giving up on the idea.
 
 **`TELLTALE_DEV`**: the `hello` and `clock` panels only register when
 `TELLTALE_DEV=1` is set before Claude Code starts; a regular install only
@@ -121,14 +122,16 @@ notification turns yellow (long-running, still counted as running); past
 `2 h` it becomes an **orphan** (`?`, yellow) and stays on screen — nothing
 auto-dismisses it — until you click it or run `/telltale agents clear`.
 
-**Clicks.** The `agents` title row carries `[1 2 3] [S C F] [x]` — style
-v1/v2/v4, size summary/compact/full, clear — the active one bold; hidden
-when the row is too narrow.
+**Clicks.** The `agents` title row carries `[1 2 3] [S C F] [R B RB] [x]` —
+style v1/v2/v4, size summary/compact/full, edge right/bottom/both, clear —
+the active one bold; hidden when the row is too narrow.
 
-**Why `$.ui.open` shows up in `calls:` below.** `$.ui.*` only ever draws;
-`open`/`close` control whether the `Pane` surface is visible at all, so
-telltale has to call `open` once for the Pane to render anything — it isn't
-telltale reaching out to move data anywhere.
+**Why `$.ui.open`/`$.ui.close` show up in `calls:` below.** `$.ui.*` only
+ever draws; `open`/`close` control whether the `Pane` surface is visible at
+all, so telltale has to call `open` once for the Pane to render anything, and
+`close` when `/telltale agents edge bottom` (or the `[B]` button) puts
+`agents` back in the AbovePrompt band instead — neither is telltale reaching
+out to move data anywhere.
 
 **Why `$.session.id`/`$.store.keys`/`$.store.delete` show up too.**
 `$.session.id` is read once so each session keeps its own cells (the store
@@ -171,10 +174,13 @@ someone has to arbitrate the shared space.
   cell that scrolls off, or a session that ends, is gone; open a fresh
   session and you start from whatever `$.agent.list()`/notifications report
   as still in flight.
-- **`agents` only draws in two positions**, not the four screen edges the
-  v0.2 design draft sketched: a `Pane` docked right on a wide terminal, or a
-  boxed panel above the input on a narrow one. That's this Claude Code
-  build's engine, not a scope cut telltale made on purpose.
+- **`agents` only draws in the two positions the engine offers**, not the
+  four screen edges the v0.2 design draft sketched: a `Pane` docked right on
+  a wide terminal, or a boxed panel above the input on a narrow one.
+  `/telltale agents edge` picks between them (`right`/`bottom`) or shows both
+  at once (`both`, `agents` in the `Pane`, everything else above the
+  prompt) — `top`/`left` answer `not available in this build`. That's this
+  Claude Code build's engine, not a scope cut telltale made on purpose.
 - **`$.store` lives on disk at `~/.claude/plugins/store/`**, one JSON file per plugin, named after its provenance (`telltale_inline-<hash>.json` for a `--plugin-dir` checkout, `telltale_<marketplace>-<hash>.json` when installed), outside `${CLAUDE_PLUGIN_DATA}`. `claude plugin uninstall telltale` does not delete it. To reset telltale's state (panel toggles, cached poll data) by hand:
 
   ```bash

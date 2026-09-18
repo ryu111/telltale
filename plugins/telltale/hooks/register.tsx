@@ -60,6 +60,8 @@ const isRowMessage = (data: unknown): data is RowMessage =>
 type StyleMessage = { kind: "style"; id: string; value: "v1" | "v2" | "v4" };
 type SizeMessage = { kind: "size"; id: string; value: Stage };
 type ClearMessage = { kind: "clear"; id: string };
+// Ticket 27 (SDD §2.8 "換邊三態"): the title-row `[R B RB]` group's own message.
+type EdgeMessage = { kind: "edge"; id: string; value: "right" | "bottom" | "both" };
 
 const isStyleMessage = (data: unknown): data is StyleMessage =>
   typeof data === "object" &&
@@ -81,6 +83,15 @@ const isClearMessage = (data: unknown): data is ClearMessage =>
   (data as { kind?: unknown }).kind === "clear" &&
   typeof (data as { id?: unknown }).id === "string";
 
+const isEdgeMessage = (data: unknown): data is EdgeMessage =>
+  typeof data === "object" &&
+  data !== null &&
+  (data as { kind?: unknown }).kind === "edge" &&
+  typeof (data as { id?: unknown }).id === "string" &&
+  ((data as { value?: unknown }).value === "right" ||
+    (data as { value?: unknown }).value === "bottom" ||
+    (data as { value?: unknown }).value === "both");
+
 const stagesOf = (p: Panel): Stages | undefined => p.stages;
 
 // Ticket 23: whether any active panel is currently erroring — read before
@@ -100,6 +111,22 @@ async function anyPanelErroring(active: readonly Panel[], $: any, liveKey: (base
   return errors.some((error) => error !== "");
 }
 
+// Ticket 27 (SDD §2.8 "換邊三態"): the Pane's open/close side effect of
+// setting `edge.agents` — called from both `command.run` (via `agents edge
+// <v>`'s `writes`) and `ui.message { kind: "edge" }`, so it has to be a
+// top-level function (the same reason `buildBandProps` below is one): `claude
+// plugin validate --strict` only follows `$` into a function named at the
+// top of this file, not into a closure reachable from two different hook
+// bodies. `bottom` never has a Pane to draw into; `right`/`both` both do.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function applyEdge($: any, value: "right" | "bottom" | "both"): Promise<void> {
+  if (value === "bottom") {
+    await $.ui.close({ id: "telltale" });
+  } else {
+    await $.ui.open({ id: "telltale", title: "telltale" });
+  }
+}
+
 // Ticket 16: shared by both `ui.render` sites (AbovePrompt and Pane) —
 // the same `props` algorithm regardless of which surface ends up drawing
 // it, only `maxRows`/`viewport.columns` differ per call site. A top-level
@@ -113,6 +140,13 @@ async function anyPanelErroring(active: readonly Panel[], $: any, liveKey: (base
 // touches, plus there's no `tsc` step in this repo's checks — see
 // 00-共同規則); left as `any` rather than re-deriving a shared alias.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+// Ticket 27 (SDD §2.8 "換邊三態"): `only` narrows which panels this pass
+// lays out and draws — `"agents"` for the Pane at `edge.agents === "both"`,
+// `"others"` for AbovePrompt at the same value; `undefined` (every other
+// edge value) keeps the old whole-`active` behavior. Filtered before
+// `wants`/`anyPanelErroring` too, so a panel that isn't drawn here doesn't
+// consume row budget or force the status row on for an error the other site
+// is already showing.
 async function buildBandProps(
   active: readonly Panel[],
   $: any,
@@ -120,11 +154,13 @@ async function buildBandProps(
   viewportColumns: number | undefined,
   placement: "dock" | "inline",
   liveKey: (base: string) => string,
+  only?: "agents" | "others",
 ): Promise<BandProps> {
-  const byId = new Map(active.map((p) => [p.id, p] as const));
+  const drawn = only === "agents" ? active.filter((p) => p.id === "agents") : only === "others" ? active.filter((p) => p.id !== "agents") : active;
+  const byId = new Map(drawn.map((p) => [p.id, p] as const));
   const panelsState = ((await $.store.get("panels")) as Record<string, boolean> | undefined) ?? {};
   const wants = await Promise.all(
-    active
+    drawn
       .filter((p) => panelsState[p.id] ?? p.defaultOn)
       .map(async (p) => {
         if (!stagesOf(p)) return { id: p.id, minRows: p.minRows, wantRows: p.wantRows };
@@ -134,7 +170,7 @@ async function buildBandProps(
       }),
   );
 
-  const status = await anyPanelErroring(active, $, liveKey);
+  const status = await anyPanelErroring(drawn, $, liveKey);
   const { slots, dropped, total, status: statusRow } = layout(wants, maxRows, { status });
   const columnsForView = Math.max(MIN_COLUMNS, viewportColumns ?? 80);
   const now = await $.clock.now();
@@ -157,6 +193,8 @@ async function buildBandProps(
         const storedStyle = (await $.store.get("style.agents")) as "auto" | "v1" | "v2" | "v4" | undefined;
         const style = storedStyle !== undefined && storedStyle !== "auto" ? storedStyle : placement === "dock" ? "v2" : "v1";
         const size = ((await $.store.get(`size.${p.id}`)) as Stage | undefined) ?? p.defaultStage ?? "compact";
+        // Ticket 27: the title row's `[R B RB]` group's active button.
+        const edge = ((await $.store.get("edge.agents")) as "right" | "bottom" | "both" | undefined) ?? "right";
         const view = p.view(cells, columnsForView, slot.rows) as { kind?: string; cells?: unknown };
         return {
           id: p.id,
@@ -164,7 +202,7 @@ async function buildBandProps(
           rows: slot.rows,
           lines: [],
           ...(view.kind === "cells" ? { cells: view.cells, style } : {}),
-          buttons: { style, size },
+          buttons: { style, size, edge },
           at: null,
           error: error === "" ? null : error,
           stages: Boolean(stagesOf(p)),
@@ -304,7 +342,11 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
     // prompt. The engine — not this plugin — decides which of the two
     // `ui.render` sites below actually draws (Pane docked vs. AbovePrompt).
     if (hasAgents) {
-      await $.ui.open({ id: "telltale", title: "telltale" });
+      // Ticket 27: 沒存視同 right — only `bottom` skips the open.
+      const edge = ((await $.store.get("edge.agents")) as "right" | "bottom" | "both" | undefined) ?? "right";
+      if (edge !== "bottom") {
+        await $.ui.open({ id: "telltale", title: "telltale" });
+      }
     }
 
     for (const p of active) {
@@ -366,8 +408,21 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
     if (headless) return next(e);
     if (e.props.hasSurvey) return next(e);
 
+    // Ticket 27 (SDD §2.8 "換邊三態"): no `agents` panel means no Pane was
+    // ever opened, so this site behaves as `bottom` always did — draws
+    // everything. With `agents` live, 沒存視同 right: `right` hands the
+    // whole band to the Pane (this site yields), `both` draws every panel
+    // but `agents` (yielding too when there's nothing else to show), and
+    // only `bottom` actually draws here.
+    const hasAgents = active.some((p) => p.id === "agents");
+    const edge = hasAgents ? (((await $.store.get("edge.agents")) as "right" | "bottom" | "both" | undefined) ?? "right") : "bottom";
+    if (edge === "right") return next(e);
+    const hasOthers = active.some((p) => p.id !== "agents");
+    if (edge === "both" && !hasOthers) return next(e);
+
     const viewportColumns = (e.viewport as { columns?: number } | undefined)?.columns;
-    const props = await buildBandProps(active, $, e.props.maxRows as number, viewportColumns, "inline", liveKey);
+    const only = edge === "both" ? "others" : undefined;
+    const props = await buildBandProps(active, $, e.props.maxRows as number, viewportColumns, "inline", liveKey, only);
 
     const { Client } = $.ui.resolve(e);
     return <Client key="band" module="./band.tsx" props={props} />;
@@ -383,12 +438,19 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
   // ceiling `command.run` already uses when it has no live viewport either.
   on("ui.render", { component: "Pane" }, async ($, e, next) => {
     if (headless) return next(e);
+    // Ticket 27: 沒存視同 right — `bottom` is the one value with no Pane to
+    // draw into (session.start never opened it), so this site yields.
+    const hasAgents = active.some((p) => p.id === "agents");
+    const edge = hasAgents ? (((await $.store.get("edge.agents")) as "right" | "bottom" | "both" | undefined) ?? "right") : "right";
+    if (edge === "bottom") return next(e);
+
     const viewportColumns = (e.viewport as { columns?: number } | undefined)?.columns;
     // Ticket 24: `Pane.placement` (claude-code.d.ts, 2.1.274) — `"dock"` on
     // a wide-enough terminal, `"inline"` when the engine floats it above
     // the prompt instead; drives the placement-derived style default.
     const placement = ((e.props as { placement?: "dock" | "inline" } | undefined)?.placement ?? "dock") as "dock" | "inline";
-    const props = await buildBandProps(active, $, BAND_ROWS_MAX, viewportColumns, placement, liveKey);
+    const only = edge === "both" ? "agents" : undefined;
+    const props = await buildBandProps(active, $, BAND_ROWS_MAX, viewportColumns, placement, liveKey, only);
 
     const { Client } = $.ui.resolve(e);
     return <Client key="band" module="./band.tsx" props={props} />;
@@ -430,6 +492,12 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
         await $.store.set(`size.${data.id}`, data.value);
         $.ui.invalidate("ui.render");
       }
+    } else if (isEdgeMessage(data) && data.id === "agents") {
+      // Ticket 27: the `[R B RB]` button group — same key and same
+      // open/close side effect as `/telltale agents edge <v>`.
+      await $.store.set("edge.agents", data.value);
+      await applyEdge($, data.value);
+      $.ui.invalidate("ui.render");
     } else if (isClearMessage(data) && data.id === "agents") {
       // Ticket 24: the `[x]` button — same filter as `/telltale agents clear`.
       const cells = ((await $.store.get(liveKey("agents.cells"))) as Cells | undefined) ?? {};
@@ -518,6 +586,8 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
       // this session's own key before it actually reaches the store.
       for (const [key, value] of Object.entries(result.writes)) {
         await $.store.set(key === "agents.cells" ? liveKey("agents.cells") : key, value);
+        // Ticket 27: `agents edge <v>` also has to flip the Pane open/closed.
+        if (key === "edge.agents") await applyEdge($, value as "right" | "bottom" | "both");
       }
       changed = true;
     }

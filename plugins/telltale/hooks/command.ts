@@ -6,7 +6,7 @@ import type { Cell } from "./cells";
 
 export type AgentsView = {
   style: "auto" | "v1" | "v2" | "v4";
-  edge: "right" | "bottom";
+  edge: "right" | "bottom" | "both";
   size: "summary" | "compact" | "full";
   cells: Record<string, Cell>;
 };
@@ -153,7 +153,7 @@ const agentsCommand = (tokens: readonly string[], state: TelltaleState): Telltal
 
   if (sub === "edge") {
     if (tokens.length === 2) return { text: `agents edge: ${view.edge}`, panels: state.panels, sizes: state.sizes };
-    if (tokens.length === 3 && (value === "right" || value === "bottom")) {
+    if (tokens.length === 3 && (value === "right" || value === "bottom" || value === "both")) {
       return agentsSet("edge.agents", "edge", view.edge, value, state);
     }
     if (tokens.length === 3 && (value === "top" || value === "left")) {
