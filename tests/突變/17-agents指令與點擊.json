@@ -8,7 +8,7 @@
   {
     "label": "agents edge: unsupported value silently accepted",
     "file": "plugins/telltale/hooks/command.ts",
-    "old": "    if (tokens.length === 3 && (value === \"right\" || value === \"bottom\" || value === \"both\")) {",
+    "old": "    if (tokens.length === 3 && (value === \"auto\" || value === \"right\" || value === \"bottom\" || value === \"both\")) {",
     "new": "    if (tokens.length === 3 && value !== undefined) {"
   },
   {
