@@ -1,0 +1,7 @@
+LICENSE
+README.md
+pyproject.toml
+telltale.egg-info/PKG-INFO
+telltale.egg-info/SOURCES.txt
+telltale.egg-info/dependency_links.txt
+telltale.egg-info/top_level.txt
