@@ -1,0 +1,20 @@
+[
+  {
+    "label": "auto never falls back above the prompt",
+    "file": "plugins/telltale/hooks/command.ts",
+    "old": "  return paneSeen ? \"right\" : \"bottom\";",
+    "new": "  return \"right\";"
+  },
+  {
+    "label": "pane render never marks paneSeen",
+    "file": "plugins/telltale/hooks/register.tsx",
+    "old": "      paneSeen = true;",
+    "new": "      paneSeen = false;"
+  },
+  {
+    "label": "explicit right also falls back",
+    "file": "plugins/telltale/hooks/command.ts",
+    "old": "  if (stored === \"right\" || stored === \"bottom\" || stored === \"both\") return stored;",
+    "new": "  if (stored === \"bottom\" || stored === \"both\") return stored;"
+  }
+]

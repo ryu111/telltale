@@ -4,7 +4,7 @@
 // $.agent.list, $.env.get, $.ui.open, $.session.id, $.store.keys, $.store.delete.
 
 import type { On, PluginOptions, Register } from "claude-code";
-import { clearDismissable, runTelltale, type AgentsView, type TelltaleState } from "./command";
+import { clearDismissable, effectiveEdge, runTelltale, type AgentsView, type TelltaleState } from "./command";
 import { BAND_ROWS_MAX, layout, MIN_COLUMNS, nextStage, rowsForStage, type Stage, type Stages } from "./layout";
 import type { BandPanel, BandProps } from "./hit";
 import type { Panel } from "./panel";
@@ -25,6 +25,18 @@ import { PANELS } from "./panels/index";
 
 // SDD §3: a poll result whose JSON encoding exceeds this is dropped, not stored.
 const DATA_MAX_BYTES = 64 * 1024;
+
+// Ticket 29 (SDD §2.8 "換邊 auto 退路"): has the Pane's `ui.render` actually
+// reached this hooks module this session? A real module-level variable (not
+// a `registerHooks` closure local like `headless`/`sid`) because
+// `buildBandProps` — a top-level function `claude plugin validate --strict`
+// requires for the reason documented on its own declaration below — reads it
+// directly to compute the agents panel's effective `buttons.edge`, and a
+// top-level function can't close over `registerHooks`' locals. Reset to
+// `false` at the top of every interactive `session.start` (a fresh session
+// hasn't seen its own Pane render yet, whatever the previous session left it
+// at) — never read or written by a headless session.
+let paneSeen = false;
 
 // Ticket 26 / SDD §2.8: another session's agents cells are stale (not
 // resumable) once its most recent cell update is this old; swept at the
@@ -118,8 +130,13 @@ async function anyPanelErroring(active: readonly Panel[], $: any, liveKey: (base
 // plugin validate --strict` only follows `$` into a function named at the
 // top of this file, not into a closure reachable from two different hook
 // bodies. `bottom` never has a Pane to draw into; `right`/`both` both do.
+// Ticket 29: `value` widens to include "auto" — `/telltale agents edge auto`
+// writes it through the same `writes` path as right/bottom/both (below), and
+// "auto" belongs in the `else` branch same as right/both (it still wants the
+// Pane open; the AbovePrompt fallback is what covers a host that never
+// actually renders it).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function applyEdge($: any, value: "right" | "bottom" | "both"): Promise<void> {
+async function applyEdge($: any, value: "auto" | "right" | "bottom" | "both"): Promise<void> {
   if (value === "bottom") {
     await $.ui.close({ id: "telltale" });
   } else {
@@ -194,7 +211,11 @@ async function buildBandProps(
         const style = storedStyle !== undefined && storedStyle !== "auto" ? storedStyle : placement === "dock" ? "v2" : "v1";
         const size = ((await $.store.get(`size.${p.id}`)) as Stage | undefined) ?? p.defaultStage ?? "compact";
         // Ticket 27: the title row's `[R B RB]` group's active button.
-        const edge = ((await $.store.get("edge.agents")) as "right" | "bottom" | "both" | undefined) ?? "right";
+        // Ticket 29: the *effective* value (module-level `paneSeen`), not
+        // the raw stored one — `auto`/unset shows `bottom` until the Pane
+        // has actually rendered, `right` after.
+        const storedEdge = (await $.store.get("edge.agents")) as "auto" | "right" | "bottom" | "both" | undefined;
+        const edge = effectiveEdge(storedEdge, paneSeen);
         const view = p.view(cells, columnsForView, slot.rows) as { kind?: string; cells?: unknown };
         return {
           id: p.id,
@@ -291,6 +312,11 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
 
     if (headless) return next(e);
 
+    // Ticket 29: this session hasn't had a Pane render reach it yet, no
+    // matter what a previous `registerHooks` call (a different session, or
+    // an earlier test's `boot()`) left `paneSeen` at.
+    paneSeen = false;
+
     const dev = await $.env.get("TELLTALE_DEV");
     active = panels.filter((p) => !DEV_ONLY_PANEL_IDS.has(p.id) || dev === "1");
 
@@ -342,9 +368,12 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
     // prompt. The engine — not this plugin — decides which of the two
     // `ui.render` sites below actually draws (Pane docked vs. AbovePrompt).
     if (hasAgents) {
-      // Ticket 27: 沒存視同 right — only `bottom` skips the open.
-      const edge = ((await $.store.get("edge.agents")) as "right" | "bottom" | "both" | undefined) ?? "right";
-      if (edge !== "bottom") {
+      // Ticket 27 / 29: only an explicit `bottom` skips the open — auto
+      // (unset, or the literal "auto") still asks for the Pane even though
+      // `paneSeen` is false right now; the AbovePrompt fallback below is
+      // what covers a host that never actually renders it.
+      const stored = (await $.store.get("edge.agents")) as "auto" | "right" | "bottom" | "both" | undefined;
+      if (stored !== "bottom") {
         await $.ui.open({ id: "telltale", title: "telltale" });
       }
     }
@@ -410,12 +439,14 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
 
     // Ticket 27 (SDD §2.8 "換邊三態"): no `agents` panel means no Pane was
     // ever opened, so this site behaves as `bottom` always did — draws
-    // everything. With `agents` live, 沒存視同 right: `right` hands the
-    // whole band to the Pane (this site yields), `both` draws every panel
-    // but `agents` (yielding too when there's nothing else to show), and
-    // only `bottom` actually draws here.
+    // everything. With `agents` live, an explicit value wins outright;
+    // auto/unset (ticket 29 "換邊 auto 退路") draws everything here until the
+    // Pane's own `ui.render` has actually reached this session (`paneSeen`),
+    // then yields — the real-machine fallback for a host that opens the
+    // Pane but never renders it.
     const hasAgents = active.some((p) => p.id === "agents");
-    const edge = hasAgents ? (((await $.store.get("edge.agents")) as "right" | "bottom" | "both" | undefined) ?? "right") : "bottom";
+    const stored = hasAgents ? ((await $.store.get("edge.agents")) as "auto" | "right" | "bottom" | "both" | undefined) : "bottom";
+    const edge = effectiveEdge(stored, paneSeen);
     if (edge === "right") return next(e);
     const hasOthers = active.some((p) => p.id !== "agents");
     if (edge === "both" && !hasOthers) return next(e);
@@ -438,11 +469,23 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
   // ceiling `command.run` already uses when it has no live viewport either.
   on("ui.render", { component: "Pane" }, async ($, e, next) => {
     if (headless) return next(e);
-    // Ticket 27: 沒存視同 right — `bottom` is the one value with no Pane to
-    // draw into (session.start never opened it), so this site yields.
+    // Ticket 27: an explicit `bottom` is the one stored value with no Pane
+    // to draw into (session.start never opened it), so this site yields.
+    // Ticket 29: any other stored value (including auto/unset) means the
+    // Pane really is rendering right now — mark `paneSeen` below so the
+    // AbovePrompt fallback can yield to it from here on.
     const hasAgents = active.some((p) => p.id === "agents");
-    const edge = hasAgents ? (((await $.store.get("edge.agents")) as "right" | "bottom" | "both" | undefined) ?? "right") : "right";
-    if (edge === "bottom") return next(e);
+    const stored = hasAgents ? ((await $.store.get("edge.agents")) as "auto" | "right" | "bottom" | "both" | undefined) : "right";
+    if (stored === "bottom") return next(e);
+
+    if (!paneSeen) {
+      paneSeen = true;
+      // First sighting only (SDD §2.8): AbovePrompt was drawing the whole
+      // band under the "Pane hasn't shown up yet" fallback — tell it to
+      // redraw now that it can yield to this Pane.
+      $.ui.invalidate("ui.render");
+    }
+    const edge = effectiveEdge(stored, paneSeen);
 
     const viewportColumns = (e.viewport as { columns?: number } | undefined)?.columns;
     // Ticket 24: `Pane.placement` (claude-code.d.ts, 2.1.274) — `"dock"` on
@@ -548,7 +591,11 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
           // (or "auto" itself when nothing's stored) — matching what
           // `/telltale agents style` with no args should say (SDD §2.8).
           style: ((await $.store.get("style.agents")) as AgentsView["style"] | undefined) ?? "auto",
-          edge: ((await $.store.get("edge.agents")) as AgentsView["edge"] | undefined) ?? "right",
+          // Ticket 29: nothing stored reports as "auto", not "right" —
+          // `command.run` has no live `paneSeen` of its own to resolve it
+          // against (that's what the two `ui.render` sites and their
+          // `buttons.edge` are for).
+          edge: ((await $.store.get("edge.agents")) as AgentsView["edge"] | undefined) ?? "auto",
           size: ((await $.store.get("size.agents")) as AgentsView["size"] | undefined) ?? agentsPanel.defaultStage ?? "compact",
           cells: ((await $.store.get(liveKey("agents.cells"))) as Cells | undefined) ?? {},
         }
@@ -587,7 +634,7 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
       for (const [key, value] of Object.entries(result.writes)) {
         await $.store.set(key === "agents.cells" ? liveKey("agents.cells") : key, value);
         // Ticket 27: `agents edge <v>` also has to flip the Pane open/closed.
-        if (key === "edge.agents") await applyEdge($, value as "right" | "bottom" | "both");
+        if (key === "edge.agents") await applyEdge($, value as "auto" | "right" | "bottom" | "both");
       }
       changed = true;
     }

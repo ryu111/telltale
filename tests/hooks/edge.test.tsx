@@ -75,10 +75,10 @@ test("both: the Pane draws only agents, AbovePrompt the others; with no others A
 
 test("/telltale agents edge: bottom closes the Pane, right/both open it, each invalidates; top stays unavailable", async () => {
   const eng = await boot();
-  expect(await eng.fire("command.run", { command: "telltale", args: "agents edge" })).toEqual({ text: "agents edge: right" });
+  expect(await eng.fire("command.run", { command: "telltale", args: "agents edge" })).toEqual({ text: "agents edge: auto" });
 
   let before = eng.invalidations;
-  expect(await eng.fire("command.run", { command: "telltale", args: "agents edge bottom" })).toEqual({ text: "agents edge: right → bottom" });
+  expect(await eng.fire("command.run", { command: "telltale", args: "agents edge bottom" })).toEqual({ text: "agents edge: auto → bottom" });
   expect(eng.store["edge.agents"]).toBe("bottom");
   expect(eng.opened).toEqual([]);
   expect(eng.calls["$.ui.close"]).toBe(1);
