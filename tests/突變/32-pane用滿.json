@@ -1,0 +1,26 @@
+[
+  {
+    "label": "layout: cap ignored",
+    "file": "plugins/telltale/hooks/layout.ts",
+    "old": "Math.min(maxRows, cap)",
+    "new": "Math.min(maxRows, BAND_ROWS_MAX)"
+  },
+  {
+    "label": "pane site still capped at BAND_ROWS_MAX",
+    "file": "plugins/telltale/hooks/register.tsx",
+    "old": "buildBandProps(active, $, bodyRows, viewportColumns, placement, liveKey, only, bodyRows)",
+    "new": "buildBandProps(active, $, bodyRows, viewportColumns, placement, liveKey, only, BAND_ROWS_MAX)"
+  },
+  {
+    "label": "compact does not collapse",
+    "file": "plugins/telltale/hooks/cells.ts",
+    "old": "if (forceCollapsed || cell.collapsed === true) return true;",
+    "new": "if (cell.collapsed === true) return true;"
+  },
+  {
+    "label": "unlisted idle never completes",
+    "file": "plugins/telltale/hooks/panels/agents.ts",
+    "old": "now - cell.updatedAt > UNLISTED_IDLE_MS",
+    "new": "false"
+  }
+]

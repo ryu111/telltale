@@ -172,6 +172,7 @@ async function buildBandProps(
   placement: "dock" | "inline",
   liveKey: (base: string) => string,
   only?: "agents" | "others",
+  cap: number = BAND_ROWS_MAX,
 ): Promise<BandProps> {
   const drawn = only === "agents" ? active.filter((p) => p.id === "agents") : only === "others" ? active.filter((p) => p.id !== "agents") : active;
   const byId = new Map(drawn.map((p) => [p.id, p] as const));
@@ -182,13 +183,13 @@ async function buildBandProps(
       .map(async (p) => {
         if (!stagesOf(p)) return { id: p.id, minRows: p.minRows, wantRows: p.wantRows };
         const stage = ((await $.store.get(`size.${p.id}`)) as Stage | undefined) ?? p.defaultStage ?? "compact";
-        const { minRows, wantRows } = rowsForStage(stage);
+        const { minRows, wantRows } = rowsForStage(stage, cap);
         return { id: p.id, minRows, wantRows };
       }),
   );
 
   const status = await anyPanelErroring(drawn, $, liveKey);
-  const { slots, dropped, total, status: statusRow } = layout(wants, maxRows, { status });
+  const { slots, dropped, total, status: statusRow } = layout(wants, maxRows, { status, cap });
   const columnsForView = Math.max(MIN_COLUMNS, viewportColumns ?? 80);
   const now = await $.clock.now();
 
@@ -498,7 +499,14 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
     // the prompt instead; drives the placement-derived style default.
     const placement = ((e.props as { placement?: "dock" | "inline" } | undefined)?.placement ?? "dock") as "dock" | "inline";
     const only = edge === "both" ? "agents" : undefined;
-    const props = await buildBandProps(active, $, BAND_ROWS_MAX, viewportColumns, placement, liveKey, only);
+    // Ticket 32 (SDD §2.8 "Pane 用滿"): the Pane's own row budget, not
+    // `BAND_ROWS_MAX` — the engine tells this site exactly how many rows
+    // its body has (`scroll.bodyRows`); missing it (an old harness) falls
+    // back to the old ceiling. Used as both `maxRows` and `cap` so a Pane
+    // taller than `BAND_ROWS_MAX` actually fills, and `full` panels want
+    // the rest of it.
+    const bodyRows = ((e.props as { scroll?: { bodyRows?: number } } | undefined)?.scroll?.bodyRows) ?? BAND_ROWS_MAX;
+    const props = await buildBandProps(active, $, bodyRows, viewportColumns, placement, liveKey, only, bodyRows);
 
     const { Client } = $.ui.resolve(e);
     return <Client key="band" module="./band.tsx" props={props} />;

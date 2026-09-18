@@ -114,6 +114,8 @@ export TELLTALE_DEV=1   # also register the hello/clock demo panels
 **Subagents.** In this build, `turn.step` reliably carries `agentId` for
 subagent turns, distinct from the main loop's own turns (`agentId` absent),
 so a subagent's steps land on its own cell — this was verified, not assumed.
+A workflow's agents are not listed by the engine, so their cells complete
+after two idle minutes instead of on a status change.
 
 **Background command limits.** Background commands are matched to their cell
 by `description` text parsed out of the completion notification, because the

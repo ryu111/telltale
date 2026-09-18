@@ -2,8 +2,8 @@
   {
     "label": "user collapse ignored",
     "file": "plugins/telltale/hooks/cells.ts",
-    "old": "  if (cell.collapsed === true) return true;",
-    "new": "  if (cell.collapsed === true) return false;"
+    "old": "  if (forceCollapsed || cell.collapsed === true) return true;",
+    "new": "  if (forceCollapsed) return true;"
   },
   {
     "label": "expanded never reopens",

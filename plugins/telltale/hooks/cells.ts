@@ -17,6 +17,7 @@ export type Cell = {
   steps: Step[];
   dismissed?: true;
   collapsed?: true; // ticket 17: onRow toggles this for a running cell
+  listed?: true; // ticket 32: `$.agent.list()` has named this cell at least once (SDD §2.8)
 };
 
 // Ticket 31: click-to-expand state (SDD §2.8), passed alongside `now` to
@@ -140,14 +141,16 @@ export const fitCells = (cells: readonly Cell[], budget: number): { shown: Cell[
 };
 
 /**
- * Whether `cell` draws collapsed. A running cell the user collapsed via
- * `onRow` (`cell.collapsed`) always wins; otherwise only `completed` cells
- * auto-collapse past `COLLAPSE_AFTER_MS` (DESIGN §3; failed/killed/orphan
- * stay until dismissed), and a fresh click-to-expand (`expanded`, ticket 31,
- * SDD §2.8) reopens that one cell for `EXPANDED_MS`.
+ * Whether `cell` draws collapsed. `forceCollapsed` (ticket 32, SDD §2.8: a
+ * panel drawn at the `compact` stage) beats everything else outright — no
+ * expand, ever, no matter what `expanded` says. Otherwise a running cell the
+ * user collapsed via `onRow` (`cell.collapsed`) always wins; otherwise only
+ * `completed` cells auto-collapse past `COLLAPSE_AFTER_MS` (DESIGN §3;
+ * failed/killed/orphan stay until dismissed), and a fresh click-to-expand
+ * (`expanded`, ticket 31, SDD §2.8) reopens that one cell for `EXPANDED_MS`.
  */
-export const isCollapsed = (cell: Cell, now: number, expanded: Expanded = null): boolean => {
-  if (cell.collapsed === true) return true;
+export const isCollapsed = (cell: Cell, now: number, expanded: Expanded = null, forceCollapsed = false): boolean => {
+  if (forceCollapsed || cell.collapsed === true) return true;
   if (cell.status !== "completed" || cell.endAt === undefined || now - cell.endAt <= COLLAPSE_AFTER_MS) return false;
   return !(expanded !== null && expanded.id === cell.id && now - expanded.at < EXPANDED_MS);
 };
@@ -388,9 +391,9 @@ const buildV1Chain = (cell: Cell, w: number, now: number): { top: Col[]; mid: Co
   };
 };
 
-const renderV1 = (cell: Cell, w: number, h: number, now: number, frame: number, expanded: Expanded): CellLine[] => {
+const renderV1 = (cell: Cell, w: number, h: number, now: number, frame: number, expanded: Expanded, forceCollapsed: boolean): CellLine[] => {
   const header = colsToLine(headerCols(cell, w, now, frame));
-  if (isCollapsed(cell, now, expanded)) return [header];
+  if (isCollapsed(cell, now, expanded, forceCollapsed)) return [header];
   const { top, mid, bot } = buildV1Chain(cell, w, now);
   return [header, colsToLine(top), colsToLine(mid), colsToLine(bot)].slice(0, Math.max(0, h));
 };
@@ -421,8 +424,8 @@ const v2NodeRow = (cell: Cell, i: number, inner: number, now: number): Col[] => 
 
 const v2EdgeRow = (cell: Cell, inner: number): Col[] => fitLeft([...toCols(" ", edgeTone(cell)), ...toCols(SYMBOLS.boxV, edgeTone(cell))], inner, "greyDeep");
 
-const renderV2Layout = (cell: Cell, w: number, h: number, now: number, frame: number, expanded: Expanded): CellLine[] => {
-  if (isCollapsed(cell, now, expanded)) return renderStrip(cell, h);
+const renderV2Layout = (cell: Cell, w: number, h: number, now: number, frame: number, expanded: Expanded, forceCollapsed: boolean): CellLine[] => {
+  if (isCollapsed(cell, now, expanded, forceCollapsed)) return renderStrip(cell, h);
   const inner = Math.max(0, w - 2);
   const bt = borderTone(cell);
 
@@ -552,14 +555,17 @@ export const renderCell = (
   frame: number,
   cam: CameraState,
   expanded: Expanded = null,
+  forceCollapsed = false,
 ): { lines: CellLine[]; cam: CameraState } => {
   // Ticket 21: the merged history cell is never a node chain, in any style.
   // Ticket 31 (SDD §2.8): a fresh click-expand names it -> the last
-  // MAIN_HISTORY_EXPAND folded turns draw under the merged row.
+  // MAIN_HISTORY_EXPAND folded turns draw under the merged row. Ticket 32:
+  // `forceCollapsed` (a `compact`-stage panel) beats that click state too —
+  // it only ever draws the merged row.
   if (cell.id === MAIN_HISTORY_ID) {
     const count = cell.steps.filter((s) => s.name === "turn").length;
     const merged = renderMainHistory(count, cell.desc, w);
-    const fresh = expanded !== null && expanded.id === MAIN_HISTORY_ID && now - expanded.at < EXPANDED_MS;
+    const fresh = !forceCollapsed && expanded !== null && expanded.id === MAIN_HISTORY_ID && now - expanded.at < EXPANDED_MS;
     if (!fresh) return { lines: [merged], cam };
     const turns = cell.steps.filter((s) => s.name === "turn").slice(-MAIN_HISTORY_EXPAND);
     const lines = [merged, ...turns.map((t) => renderMainHistoryTurn(t, w))].slice(0, Math.max(0, h));
@@ -568,11 +574,11 @@ export const renderCell = (
   if (style === "v1") {
     const stripW = cell.steps.length * NODE_W + Math.max(0, cell.steps.length - 1) * EDGE_W;
     const offset = easeCamera(cam.offset, cameraTarget(stripW, w));
-    return { lines: renderV1(cell, w, h, now, frame, expanded), cam: { offset } };
+    return { lines: renderV1(cell, w, h, now, frame, expanded, forceCollapsed), cam: { offset } };
   }
   if (style === "v4") {
     const header = colsToLine(headerCols(cell, w, now, frame));
-    if (isCollapsed(cell, now, expanded)) return { lines: [header], cam: { offset: 0 } };
+    if (isCollapsed(cell, now, expanded, forceCollapsed)) return { lines: [header], cam: { offset: 0 } };
     let chain: Col[] = toCols(" ", "greyDeep");
     cell.steps.forEach((step, i) => {
       const { symbol, symbolTone, nameTone } = nodeGlyph(cell, i, now);
@@ -584,6 +590,6 @@ export const renderCell = (
     const offset = easeCamera(cam.offset, cameraTarget(chainW, w));
     return { lines: [header, line2].slice(0, Math.max(0, h)), cam: { offset } };
   }
-  return { lines: renderV2Layout(cell, w, h, now, frame, expanded), cam };
+  return { lines: renderV2Layout(cell, w, h, now, frame, expanded, forceCollapsed), cam };
 };
 

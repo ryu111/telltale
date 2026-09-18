@@ -2,7 +2,7 @@
   {
     "label": "layout: full stage no longer gets the remaining rows",
     "file": "plugins/telltale/hooks/layout.ts",
-    "old": "return { minRows: 3, wantRows: CONTENT_ROWS_MAX };",
+    "old": "return { minRows: 3, wantRows: cap - TITLE_ROWS };",
     "new": "return { minRows: 3, wantRows: 3 };"
   },
   {

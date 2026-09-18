@@ -8,13 +8,13 @@
   {
     "label": "dropped panels do not bring the status row back",
     "file": "plugins/telltale/hooks/layout.ts",
-    "old": "  const second = computeWithFixed(panels, maxRows, FIXED_ROWS);\n  return { ...second, status: true };",
+    "old": "  const second = computeWithFixed(panels, maxRows, FIXED_ROWS, cap);\n  return { ...second, status: true };",
     "new": "  return { ...first, status: false };"
   },
   {
     "label": "error does not force the status row",
     "file": "plugins/telltale/hooks/layout.ts",
-    "old": "  if (opts?.status === true) {\n    const r = computeWithFixed(panels, maxRows, FIXED_ROWS);\n    return { ...r, status: true };\n  }",
-    "new": "  if (opts?.status === true && false) {\n    const r = computeWithFixed(panels, maxRows, FIXED_ROWS);\n    return { ...r, status: true };\n  }"
+    "old": "  if (opts?.status === true) {\n    const r = computeWithFixed(panels, maxRows, FIXED_ROWS, cap);\n    return { ...r, status: true };\n  }",
+    "new": "  if (opts?.status === true && false) {\n    const r = computeWithFixed(panels, maxRows, FIXED_ROWS, cap);\n    return { ...r, status: true };\n  }"
   }
 ]

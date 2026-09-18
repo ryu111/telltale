@@ -36,6 +36,7 @@ const applyAgentList = (cells: Cells, list: readonly { id: string; description: 
           firstAt: now,
           updatedAt: now,
           steps: [{ name: "prompt", t0: now }],
+          listed: true,
         },
       };
       continue;
@@ -52,6 +53,10 @@ const applyAgentList = (cells: Cells, list: readonly { id: string; description: 
 
     // Fill in a turn.step-created stub's desc (never rebuilds an existing cell).
     const withDesc = existing.desc === "" && existing.status === "running" ? { ...existing, desc: info.description } : existing;
+    // Ticket 32 (SDD §2.8): every cell `list` names this tick — new, desc-filled,
+    // status-translated, or unchanged — carries `listed: true` so `applyUnlistedIdle`
+    // never touches it.
+    const withListed = withDesc.listed === true ? withDesc : { ...withDesc, listed: true as const };
 
     if (existing.status === "running" && info.status !== "running") {
       const newStatus = statusOf(info.status);
@@ -59,15 +64,15 @@ const applyAgentList = (cells: Cells, list: readonly { id: string; description: 
       working = {
         ...working,
         [info.id]: {
-          ...withDesc,
+          ...withListed,
           status: newStatus,
           endAt: now,
           updatedAt: now,
-          steps: [...withDesc.steps, { name: nodeName, t0: now }],
+          steps: [...withListed.steps, { name: nodeName, t0: now }],
         },
       };
-    } else if (withDesc !== existing) {
-      working = { ...working, [info.id]: withDesc };
+    } else if (withListed !== existing) {
+      working = { ...working, [info.id]: withListed };
     }
   }
   return working;
@@ -103,6 +108,28 @@ const applyBgCleanup = (cells: Cells, now: number): Cells => {
     if (cell.kind !== "bg" || cell.status !== "running") continue;
     if (now - cell.firstAt > ORPHAN_MS && cell.endAt === undefined) {
       working = { ...working, [cell.id]: { ...cell, status: "orphan", updatedAt: now } };
+    }
+  }
+  return working;
+};
+
+// Ticket 32 (SDD §2.8): a workflow's own agents carry ids the engine's
+// `$.agent.list()` never names (`AgentLoop.agentId`: "carry ids no list
+// names") — `applyAgentList` above can never mark them `listed`, so a stub
+// created from `turn.step` alone would otherwise run forever. Idle, not a
+// status change, is the only signal available for them.
+export const UNLISTED_IDLE_MS = 2 * 60 * 1000;
+
+/** Step 4b: a running sub cell the list has never named completes once it's been idle past UNLISTED_IDLE_MS. */
+const applyUnlistedIdle = (cells: Cells, now: number): Cells => {
+  let working = cells;
+  for (const cell of Object.values(working)) {
+    if (cell.kind !== "sub" || cell.status !== "running" || cell.listed === true) continue;
+    if (now - cell.updatedAt > UNLISTED_IDLE_MS) {
+      working = {
+        ...working,
+        [cell.id]: { ...cell, status: "completed", endAt: now, updatedAt: now, steps: [...cell.steps, { name: "reply", t0: now }] },
+      };
     }
   }
   return working;
@@ -171,6 +198,7 @@ export const agents: Panel<Cells> = {
     cells = applyAgentList(cells, list, now);
     cells = applyModelPairing(cells, io.takePending!());
     cells = applyBgCleanup(cells, now);
+    cells = applyUnlistedIdle(cells, now);
     cells = applyVanish(cells, now);
     cells = applyMainHistoryFold(cells, now);
 

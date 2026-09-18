@@ -2,7 +2,7 @@
   {
     "label": "layout: total cap ignores BAND_ROWS_MAX",
     "file": "plugins/telltale/hooks/layout.ts",
-    "old": "Math.min(maxRows, BAND_ROWS_MAX)",
+    "old": "Math.min(maxRows, cap)",
     "new": "maxRows"
   },
   {
