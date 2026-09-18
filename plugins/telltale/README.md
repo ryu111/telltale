@@ -174,7 +174,7 @@ someone has to arbitrate the shared space.
   cell that scrolls off, or a session that ends, is gone; open a fresh
   session and you start from whatever `$.agent.list()`/notifications report
   as still in flight.
-- **`agents` only draws in the two positions the engine offers**, not the
+- **`agents` draws only where the engine offers a place** (`right`, `bottom`, or `both`), not the
   four screen edges the v0.2 design draft sketched: a `Pane` docked right on
   a wide terminal, or a boxed panel above the input on a narrow one.
   `/telltale agents edge` picks between them (`right`/`bottom`) or shows both
