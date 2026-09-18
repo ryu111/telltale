@@ -267,6 +267,12 @@ const nodeGlyph = (cell: Cell, i: number, now: number): { symbol: string; symbol
   return { symbol: SYMBOLS.walked, symbolTone: kindTone(cell.steps[i]!.name), nameTone: "greyDim" };
 };
 
+// Ticket 25: cell header tool count. SDD §2.8 "cell 標題列 tool 次數".
+export const TOOL_EXCLUDED = new Set(["prompt", "think", "reply", "Agent"]);
+
+/** Count of `cell.steps` whose name is not in TOOL_EXCLUDED (tool-node calls only). */
+export const toolCount = (cell: Cell): number => cell.steps.filter((s) => !TOOL_EXCLUDED.has(s.name)).length;
+
 const borderTone = (cell: Cell): Tone2 => (cell.status === "running" ? "greenDim" : cell.status === "failed" ? "red" : "greyDeep");
 const edgeTone = (cell: Cell): Tone2 => (cell.status === "running" ? "green" : "greyDeep");
 
@@ -285,11 +291,13 @@ const headerCols = (cell: Cell, w: number, now: number, frame: number): Col[] =>
   const symbolTone: Tone2 = running ? "green" : cell.status === "failed" ? "red" : "greyDeep";
   const nameTone = dim(cell.kind === "main" ? "amber" : "violet");
 
+  const tools = toolCount(cell);
   const fixed: Col[] = [
     ...toCols(`${symbol} `, symbolTone),
     ...toCols(cell.label, nameTone),
     ...(cell.model !== undefined ? toCols(` ${cell.model}`, dim("grey")) : []),
     ...toCols(` ${formatElapsed((cell.endAt ?? now) - cell.firstAt)}`, dim("blue")),
+    ...(tools >= 1 ? toCols(` · ${tools} tools`, dim("grey")) : []),
     ...toCols(" · ", dim("grey")),
   ];
   const fixedWidth = colsWidth(fixed);

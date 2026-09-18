@@ -1,0 +1,20 @@
+[
+  {
+    "label": "Agent counted as a tool",
+    "file": "plugins/telltale/hooks/cells.ts",
+    "old": "export const TOOL_EXCLUDED = new Set([\"prompt\", \"think\", \"reply\", \"Agent\"]);",
+    "new": "export const TOOL_EXCLUDED = new Set([\"prompt\", \"think\", \"reply\"]);"
+  },
+  {
+    "label": "think counted as a tool",
+    "file": "plugins/telltale/hooks/cells.ts",
+    "old": "export const TOOL_EXCLUDED = new Set([\"prompt\", \"think\", \"reply\", \"Agent\"]);",
+    "new": "export const TOOL_EXCLUDED = new Set([\"prompt\", \"reply\", \"Agent\"]);"
+  },
+  {
+    "label": "tool count never shown",
+    "file": "plugins/telltale/hooks/cells.ts",
+    "old": "    ...(tools >= 1 ? toCols(` · ${tools} tools`, dim(\"grey\")) : []),",
+    "new": "    ...(false ? toCols(` · ${tools} tools`, dim(\"grey\")) : []),"
+  }
+]
