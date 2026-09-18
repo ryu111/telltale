@@ -22,7 +22,7 @@ const ALLOWED = [
   "$.store.set",
   "$.command.register",
 ];
-const ALLOWED_V02 = [...ALLOWED, "$.agent.list", "$.env.get", "$.ui.open", "$.session.id", "$.store.keys", "$.store.delete"]; // ticket 16 landed; ticket 26 added session.id/store.keys/store.delete; $.ui.close still unused
+const ALLOWED_V02 = [...ALLOWED, "$.agent.list", "$.env.get", "$.ui.open", "$.session.id", "$.store.keys", "$.store.delete", "$.ui.close (via applyEdge)"]; // ticket 16 landed; ticket 26 added session.id/store.keys/store.delete; ticket 27 added ui.close (validate names the helper it is reached through)
 
 type Opts = Parameters<typeof fakeEngine>[0];
 

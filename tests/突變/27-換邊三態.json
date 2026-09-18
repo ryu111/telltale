@@ -1,0 +1,20 @@
+[
+  {
+    "label": "right still draws above the prompt",
+    "file": "plugins/telltale/hooks/register.tsx",
+    "old": "    if (edge === \"right\") return next(e);",
+    "new": "    if (false) return next(e);"
+  },
+  {
+    "label": "both still puts agents above the prompt",
+    "file": "plugins/telltale/hooks/register.tsx",
+    "old": "    const only = edge === \"both\" ? \"others\" : undefined;",
+    "new": "    const only = undefined;"
+  },
+  {
+    "label": "bottom does not close the pane",
+    "file": "plugins/telltale/hooks/register.tsx",
+    "old": "    await $.ui.close({ id: \"telltale\" });",
+    "new": "    await $.ui.open({ id: \"telltale\", title: \"telltale\" });"
+  }
+]

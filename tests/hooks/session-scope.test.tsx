@@ -39,7 +39,7 @@ test("main history cell renders as exactly one line in every style", () => {
 
 test("agents panel defaults to the full stage; a demo panel still defaults to compact", async () => {
   expect(agents.defaultStage).toBe("full");
-  const eng = fakeEngine({ store: { panels: { agents: true } }, agents: [] });
+  const eng = fakeEngine({ store: { panels: { agents: true }, "edge.agents": "bottom" }, agents: [] }); // ticket 27: AbovePrompt draws only when edge is bottom
   register(eng.on, {});
   await eng.fire("session.start", {});
   const tree = await eng.fire("ui.render", { surface: "terminal", component: "AbovePrompt", viewport: { columns: 120 }, props: { hasSurvey: false, maxRows: 9 } });

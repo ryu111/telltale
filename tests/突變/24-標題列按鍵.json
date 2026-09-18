@@ -20,7 +20,7 @@
   {
     "label": "size button cycles instead of setting",
     "file": "plugins/telltale/hooks/register.tsx",
-    "old": "      const p = idx.get(data.id)!;\n      if (stagesOf(p)) {\n        await $.store.set(`size.${data.id}`, data.value);\n        $.ui.invalidate(\"ui.render\");\n      }\n    } else if (isClearMessage(data) && data.id === \"agents\") {",
-    "new": "      const p = idx.get(data.id)!;\n      if (stagesOf(p)) {\n        const current = ((await $.store.get(`size.${data.id}`)) as Stage | undefined) ?? p.defaultStage ?? \"compact\";\n        await $.store.set(`size.${data.id}`, nextStage(current));\n        $.ui.invalidate(\"ui.render\");\n      }\n    } else if (isClearMessage(data) && data.id === \"agents\") {"
+    "old": "      const p = idx.get(data.id)!;\n      if (stagesOf(p)) {\n        await $.store.set(`size.${data.id}`, data.value);\n        $.ui.invalidate(\"ui.render\");\n      }\n    } else if (isEdgeMessage(data) && data.id === \"agents\") {",
+    "new": "      const p = idx.get(data.id)!;\n      if (stagesOf(p)) {\n        const current = ((await $.store.get(`size.${data.id}`)) as Stage | undefined) ?? p.defaultStage ?? \"compact\";\n        await $.store.set(`size.${data.id}`, nextStage(current));\n        $.ui.invalidate(\"ui.render\");\n      }\n    } else if (isEdgeMessage(data) && data.id === \"agents\") {"
   }
 ]

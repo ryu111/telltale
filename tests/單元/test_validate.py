@@ -24,7 +24,7 @@ from pathlib import Path
     "$.store.delete",
     "$.env.get",
     "$.ui.open",
-    "$.ui.close",
+    "$.ui.close (via applyEdge)",
 }
 
 
