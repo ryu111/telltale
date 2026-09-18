@@ -81,6 +81,7 @@ test("renderCell: a user-collapsed running cell draws only its header in v1/v4 a
   expect(renderCell(c, "v1", 80, 4, NOW, 0, { offset: 0 }).lines).toHaveLength(1);
   expect(renderCell(c, "v4", 80, 2, NOW, 0, { offset: 0 }).lines).toHaveLength(1);
   expect(renderCell(c, "v2", 40, 8, NOW, 0, { offset: 0 }).lines).toEqual(renderStrip(c, 8));
+  expect(renderStrip(c, 8)).toHaveLength(1 + c.steps.length); // head + one row per step, no blank padding to h (ticket 31: a padded strip would eat the whole panel when cells stack)
   // and without the flag the same cell draws its chain
   expect(renderCell(running, "v1", 80, 4, NOW, 0, { offset: 0 }).lines.length).toBeGreaterThan(1);
   expect(renderCell(running, "v4", 80, 2, NOW, 0, { offset: 0 }).lines).toHaveLength(2);

@@ -120,11 +120,11 @@ export const layout = (panels: readonly Want[], maxRows: number, opts?: { status
 
 規則（每條都有測試與突變）：
 0. （票 23）固定列數 `fixed`：`opts.status`（框架在有面板 `error` 時傳 true）→ `FIXED_ROWS`；否則先用 `TITLE_ROWS` 算一次，**有任何面板進 `dropped` 就改用 `FIXED_ROWS` 重算一次**（狀態列要印被砍的面板）。回傳的 `status` = 這次有沒有狀態列。
-1. `budget = min(maxRows, BAND_ROWS_MAX) - fixed`，**算一次、是常數**，不隨分配遞減後重判。
+1. `budget = min(maxRows, cap) - fixed`（`cap` 預設 `BAND_ROWS_MAX`；票 32 起 Pane 站傳 `bodyRows`），**算一次、是常數**，不隨分配遞減後重判。
 2. `budget < 1`（含 `maxRows ≤ FIXED_ROWS`、`maxRows ≤ 0`）：`slots = []`、全部進 `dropped`、`total = max(1, min(maxRows, FIXED_ROWS))`。`total === 1` 時 band 把標題與狀態合併成一列（§1.5）。
 3. 依 `panels` 順序，每個面板先拿 `PANEL_TITLE_ROWS (=1) + minRows`（從 `budget` 扣；那一列是 §1.5 的 `─ label ─` 標題列，**票 06 實測漏算過，狀態列蓋掉了 clock 的標題**）；扣不起的整個進 `dropped`，**不畫半個**，繼續看下一個（後面較小的面板仍可能塞進去）。
 4. 第一輪分完剩下的列，再依順序補到各面板的 `wantRows` 為止；補不完就留白（`total` 可以小於上限，用 `≤` 不用 `=`）。
-5. `total = (status ? FIXED_ROWS : TITLE_ROWS) + Σ (PANEL_TITLE_ROWS + slots.rows) ≤ min(maxRows, BAND_ROWS_MAX)`（規則 2 的情況除外，那時 `total ≤ FIXED_ROWS`）。`slot.rows` 是內容列數，不含標題列。
+5. `total = (status ? FIXED_ROWS : TITLE_ROWS) + Σ (PANEL_TITLE_ROWS + slots.rows) ≤ min(maxRows, cap)`（規則 2 的情況除外，那時 `total ≤ FIXED_ROWS`）。`slot.rows` 是內容列數，不含標題列。
 6. 輸出確定：同輸入同輸出；`slots` 順序 = 輸入順序；`dropped` 順序 = 輸入順序。
 7. `layout` **不吃 columns**：寬度改變永遠不改變高度。帶子高度只在「maxRows 變」或「開關變」時變（回答使用者「resize 時高度跳動」的顧慮）。
 
@@ -314,6 +314,8 @@ subagent 迴圈的 `turn.step` 是否帶 `agentId` 送進來 → 票 16 實測�
 **換邊 auto 退路（票 29；2026-09-18 真機：cmux 裡 Pane 根本不畫，`right` 讓整條帶子消失，使用者裁定「沒存時自動退回上方」）**：`edge.agents` 沒存或 `"auto"` ＝ 想要 `right`，但 **Pane 的 `ui.render` 還沒來過就先由 AbovePrompt 畫全部面板**（module 變數 `paneSeen`，Pane hook 一畫就設 true 並 `invalidate`，之後 AbovePrompt 讓位）。**票 30（2026-09-18 真機：cmux 上點 `R` 帶子消失、按鍵也跟著沒了，使用者裁定「R 也走退路」）：明存 `right` 一樣走這條退路**——`effectiveEdge` 只對 `bottom`、`both` 原樣回，其餘（`right`、`auto`、沒存）都是 `paneSeen ? "right" : "bottom"`；`right` 與 `auto` 只差「有沒有明存」（回報字串、`session.start` 都 open）。`/telltale agents edge` 沒存回 `agents edge: auto`；`agents edge auto` 可寫回。`buttons.edge` 是**生效值**（auto 時 `paneSeen ? "right" : "bottom"`）。
 
 **cell 展開／收合真的畫（票 31；2026-09-18 真機：點 cell 沒反應——票 17 只存了 `cell.collapsed` 與 `agents.expanded.<sid>`，`renderCell` 只看時間、`band.tsx` 也沒拿到 `expanded`）**：`isCollapsed(cell, now, expanded)`＝`cell.collapsed` 為 true → 收合；completed 且過 `COLLAPSE_AFTER_MS` → 收合，**除非** `expanded` 指到它且 `now − expanded.at < EXPANDED_MS`（常數搬到 `cells.ts`，`panels/agents.ts` re-export）。`renderCell` 多一個尾參數 `expanded`（預設 null），三種 style 都走同一個 `isCollapsed`。main 歷史合併列被點開時：第 1 列照舊，接最後 `MAIN_HISTORY_EXPAND = 3` 個 `turn` step 各一列 `  ✓ <elapsed> <detail>`，裁到 h。`buildBandProps` 把 `agents.expanded.<sid>` 帶進 `BandPanel.expanded`（沒存＝`null`），Client 傳給 `renderCell`；到期收合靠既有 1000 ms 幀時鐘，不加新時鐘。
+
+**Pane 用滿、段位有感、沒列名的 sub 會收（票 32；2026-09-18 真機回饋三條，使用者裁定）**：（a）`ui.render{Pane}` 的列數上限不是 `BAND_ROWS_MAX`，是引擎給的 `e.props.scroll.bodyRows`——`layout(wants, maxRows, { status, cap })` 多一個 `cap`（預設 `BAND_ROWS_MAX`，§1.2 規則 3 的「BAND_ROWS_MAX」改讀 `cap`），Pane 站傳 `cap = bodyRows`、`maxRows = bodyRows`；`agents` 的 `wantRows` 在 Pane 站＝`bodyRows − PANEL_TITLE_ROWS`（full＝rest 吃滿）。AbovePrompt 站不變。（b）段位真的改畫法（DESIGN §3）：`summary`＝只有面板標題列（0 列，現況）；`compact`＝每個 cell 只畫標題列一列（`renderCell` 尾參數 `forceCollapsed`，走票 31 的 `isCollapsed` 同一條路，點了才展開 10 s）；`full`＝現況。`BandPanel` 帶 `size`，Client 依它傳 `forceCollapsed`。（c）`applyAgentList` 對 list 裡出現過的 cell 記 `listed: true`；新的 step「沒列名收合」：`kind === "sub"`、running、沒有 `listed`、`now − updatedAt > UNLISTED_IDLE_MS (2 min)` → completed（`endAt = now`，push `reply`）——workflow 的 agent 引擎不列（型別檔 AgentLoop：「carry ids no list names」），通知只有 task id、多個 workflow 分不出誰的，所以用閒置判定。
 
 **換邊三態（票 27）**：`edge.agents ∈ { right, bottom, both }`，沒存視同 `right`（票 29 起：沒存＝auto，見上）。`right`：`session.start` `$.ui.open` Pane，`ui.render{AbovePrompt}` 直接 `return next(e)`（只畫 Pane；窄終端時引擎自己把 Pane 落到輸入框上方）。`bottom`：不 open（已開就 `$.ui.close({ id: "telltale" })`），全部面板由 AbovePrompt 畫，`ui.render{Pane}` 回 `next(e)`。`both`：Pane 只畫 `agents`，AbovePrompt 畫其餘面板（沒有其餘就 `next(e)`）。切換（指令或按鍵）時：寫鍵 → 依新值 open／close → invalidate。top／left 仍回 `not available in this build`。README「引擎只給右側 dock 與輸入框上方兩個位置」那句改成三態說明。
 

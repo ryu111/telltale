@@ -45,3 +45,4 @@ v0.2 檢查（出題者對過）：12／13／16／17 的路徑已改成 `plugins
 | 29-換邊auto退路 | §2.8 換邊 auto 退路；§1.6 `edge auto` | `tests/hooks/edge-auto.test.tsx` | register.tsx、command.ts、README | 28 |
 | 30-right也走退路 | §2.8 換邊 auto 退路（right 也走）；使用者裁定 | `tests/hooks/edge-auto.test.tsx`＋`edge.test.tsx`（新版覆蓋） | command.ts、register.tsx（註解）、README、突變 29／30 | 29 |
 | 31-cell展開收合 | §2.8 cell 展開／收合真的畫；§2.6 onRow；DESIGN §3 | `tests/hooks/cells-expand.test.ts` | cells.ts、panels/agents.ts（EXPANDED_MS）、band.tsx、register.tsx（buildBandProps）、突變 31 | 30 |
+| 32-pane用滿 | §2.8 Pane 用滿／段位有感／沒列名的 sub 會收；§1.2 規則 1／5 cap；DESIGN §3 | `tests/hooks/pane-fill.test.tsx` | layout.ts、cells.ts、panels/agents.ts、band.tsx、register.tsx、README、突變 03／31／32 | 31 |
