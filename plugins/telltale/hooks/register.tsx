@@ -1,7 +1,7 @@
 // hooks module. SDD §1.4, §3. The only place in this plugin that touches `$`.
 // Allowed `$` calls (00-共同規則 / SDD §1.4): $.ui.resolve, $.ui.invalidate,
 // $.clock.now, $.clock.every, $.store.get, $.store.set, $.command.register,
-// $.agent.list, $.env.get.
+// $.agent.list, $.env.get, $.ui.open, $.session.id, $.store.keys, $.store.delete.
 
 import type { On, PluginOptions, Register } from "claude-code";
 import { clearDismissable, runTelltale, type AgentsView, type TelltaleState } from "./command";
@@ -25,6 +25,11 @@ import { PANELS } from "./panels/index";
 
 // SDD §3: a poll result whose JSON encoding exceeds this is dropped, not stored.
 const DATA_MAX_BYTES = 64 * 1024;
+
+// Ticket 26 / SDD §2.8: another session's agents cells are stale (not
+// resumable) once its most recent cell update is this old; swept at the
+// next interactive session.start rather than on a timer of their own.
+export const STALE_SESSION_MS = 24 * 60 * 60 * 1000;
 
 type ToggleMessage = { kind: "toggle"; id: string };
 type StageMessage = { kind: "stage"; id: string };
@@ -85,9 +90,12 @@ const stagesOf = (p: Panel): Stages | undefined => p.stages;
 // documents below (it only follows `$` into a function named at the top of
 // this file).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function anyPanelErroring(active: readonly Panel[], $: any): Promise<boolean> {
+async function anyPanelErroring(active: readonly Panel[], $: any, liveKey: (base: string) => string): Promise<boolean> {
   const errors = await Promise.all(
-    active.map(async (p) => ((await $.store.get(`error.${p.id}`)) as string | undefined) ?? ""),
+    active.map(async (p) => {
+      const key = p.id === "agents" ? liveKey("error.agents") : `error.${p.id}`;
+      return ((await $.store.get(key)) as string | undefined) ?? "";
+    }),
   );
   return errors.some((error) => error !== "");
 }
@@ -111,6 +119,7 @@ async function buildBandProps(
   maxRows: number,
   viewportColumns: number | undefined,
   placement: "dock" | "inline",
+  liveKey: (base: string) => string,
 ): Promise<BandProps> {
   const byId = new Map(active.map((p) => [p.id, p] as const));
   const panelsState = ((await $.store.get("panels")) as Record<string, boolean> | undefined) ?? {};
@@ -125,7 +134,7 @@ async function buildBandProps(
       }),
   );
 
-  const status = await anyPanelErroring(active, $);
+  const status = await anyPanelErroring(active, $, liveKey);
   const { slots, dropped, total, status: statusRow } = layout(wants, maxRows, { status });
   const columnsForView = Math.max(MIN_COLUMNS, viewportColumns ?? 80);
   const now = await $.clock.now();
@@ -133,15 +142,15 @@ async function buildBandProps(
   const bandPanels = await Promise.all(
     slots.map(async (slot) => {
       const p = byId.get(slot.id)!;
-      const error = ((await $.store.get(`error.${p.id}`)) as string | undefined) ?? "";
+      const error = ((await $.store.get(p.id === "agents" ? liveKey("error.agents") : `error.${p.id}`)) as string | undefined) ?? "";
 
       // Ticket 17 (票 16 遺留接線 item 2): the agents panel's poll result
       // lives at the `agents.cells` key, not `data.agents` like every other
       // panel (register.tsx's own tick loop writes it there — see below) —
       // so its `view()` is fed straight from that key instead of the
-      // shared `data.<id>` cache.
+      // shared `data.<id>` cache. Ticket 26: session-keyed via `liveKey`.
       if (p.id === "agents") {
-        const cells = ((await $.store.get("agents.cells")) as Record<string, import("./cells").Cell> | undefined) ?? {};
+        const cells = ((await $.store.get(liveKey("agents.cells"))) as Record<string, import("./cells").Cell> | undefined) ?? {};
         // Ticket 24 / SDD §2.8 "樣式預設依 placement": a stored v1/v2/v4
         // wins outright; unset or the literal "auto" falls back to what
         // the placement implies (DESIGN §4: dock -> v2, inline -> v1).
@@ -207,6 +216,16 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
   let active: readonly Panel[] = panels;
   const byId = (): Map<string, Panel> => new Map(active.map((p) => [p.id, p] as const));
 
+  // Ticket 26 / SDD §2.8: `headless` gates every hook down to a no-op
+  // (`$.command.register` in session.start aside) once session.start sees
+  // `e.isInteractive === false`; `sid` (from `$.session.id()`) keys the
+  // three live-data store keys so concurrent sessions never see each
+  // other's agents cells (`liveKey` is the one place that does the keying —
+  // every read/write of agents.cells/expanded/error.agents goes through it).
+  let headless = false;
+  let sid = "";
+  const liveKey = (base: string): string => `${base}.${sid}`;
+
   // Ticket 12 §2.6a: spawns seen via turn.step's Agent tool uses, kept in
   // memory (not `$.store` — SDD §2.6) until the agents panel's poll pairs
   // them up against `$.agent.list()`.
@@ -218,6 +237,22 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
   };
 
   on("session.start", async ($, e, next) => {
+    // Ticket 26 / SDD §2.8: a headless session (Claude Desktop's `-p`/SDK/
+    // stream-json runs) shares this plugin's `$.store` file with every
+    // interactive terminal session — it must never poll, seed, sweep or
+    // open a Pane into that shared state. `isInteractive` missing (an old
+    // harness, or `{}`) is treated as interactive, not headless.
+    const isInteractive = (e as { isInteractive?: boolean }).isInteractive;
+    headless = isInteractive === false;
+
+    await $.command.register({
+      name: "telltale",
+      description: "Toggle panels, or show what the band is doing",
+      argumentHint: "[status|help|on|off|<panel> [on|off]]",
+    });
+
+    if (headless) return next(e);
+
     const dev = await $.env.get("TELLTALE_DEV");
     active = panels.filter((p) => !DEV_ONLY_PANEL_IDS.has(p.id) || dev === "1");
 
@@ -231,22 +266,44 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
     }
     await $.store.set("panels", panelsState);
 
-    // Ticket 21: a new session has no live task to show — cells left by a
-    // previous session (including its bg tasks) are stale, not resumable.
-    await $.store.set("agents.cells", {});
+    const hasAgents = active.some((p) => p.id === "agents");
+    if (hasAgents) {
+      // Ticket 26: this session's own id, read once and kept for the rest
+      // of the session — every agents.cells/expanded/error.agents key this
+      // hooks module touches from here on goes through `liveKey`.
+      sid = await $.session.id();
 
-    await $.command.register({
-      name: "telltale",
-      description: "Toggle panels, or show what the band is doing",
-      argumentHint: "[status|help|on|off|<panel> [on|off]]",
-    });
+      // Sweep: drop another session's agents cells once they're stale
+      // (empty, or their newest cell update is more than a day old) —
+      // still-live sessions (or ones just started, nothing stale yet) are
+      // left alone; only this plugin's own `agents.*` keys are ever touched.
+      const now = await $.clock.now();
+      const keys = await $.store.keys();
+      for (const key of keys) {
+        if (!key.startsWith("agents.cells.")) continue;
+        const other = key.slice("agents.cells.".length);
+        if (other === sid) continue;
+        const cells = ((await $.store.get(key)) as Record<string, { updatedAt: number }> | undefined) ?? {};
+        const updatedAts = Object.values(cells).map((c) => c.updatedAt);
+        const stale = updatedAts.length === 0 || Math.max(...updatedAts) < now - STALE_SESSION_MS;
+        if (stale) {
+          await $.store.delete(key);
+          await $.store.delete(`agents.expanded.${other}`);
+          await $.store.delete(`error.agents.${other}`);
+        }
+      }
+
+      // Ticket 21: a new session has no live task to show — cells left by
+      // this same session's own previous run are stale, not resumable.
+      await $.store.set(liveKey("agents.cells"), {});
+    }
 
     // Ticket 16 (DESIGN §6 item 4 / SDD §2.5): ask the engine to open a Pane
     // for the band once the agents panel is live, so the same `Band` Client
     // can be dock-placed (≥ some width) instead of always sitting above the
     // prompt. The engine — not this plugin — decides which of the two
     // `ui.render` sites below actually draws (Pane docked vs. AbovePrompt).
-    if (active.some((p) => p.id === "agents")) {
+    if (hasAgents) {
       await $.ui.open({ id: "telltale", title: "telltale" });
     }
 
@@ -266,7 +323,7 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
               ? {
                   now: () => $.clock.now(),
                   agents: () => $.agent.list(),
-                  cells: async () => ((await $.store.get("agents.cells")) as Cells | undefined) ?? {},
+                  cells: async () => ((await $.store.get(liveKey("agents.cells"))) as Cells | undefined) ?? {},
                   takePending: () => pendingThisTick,
                 }
               : { now: () => $.clock.now() };
@@ -274,9 +331,12 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
             if (p.needsAgents) pendingSpawns.unshift(...pendingThisTick);
             if (p.id === "agents") {
               // §2.1: the agents panel's poll result IS `agents.cells`, not
-              // `data.agents` — no 64 KiB check, no `error.agents` (a poll
-              // failure just throws and the catch below handles it).
-              await $.store.set("agents.cells", data);
+              // `data.agents` — no 64 KiB check. Ticket 26: a successful
+              // tick clears `error.agents.<sid>` too (the catch below is
+              // no longer the only place that key gets written), so one
+              // failed tick doesn't leave the status row stuck on forever.
+              await $.store.set(liveKey("agents.cells"), data);
+              await $.store.set(liveKey("error.agents"), "");
             } else {
               const bytes = new TextEncoder().encode(JSON.stringify(data)).length;
               if (bytes > DATA_MAX_BYTES) {
@@ -287,7 +347,8 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
               }
             }
           } catch (err) {
-            await $.store.set(`error.${p.id}`, String(err instanceof Error ? err.message : err));
+            const errorKey = p.id === "agents" ? liveKey("error.agents") : `error.${p.id}`;
+            await $.store.set(errorKey, String(err instanceof Error ? err.message : err));
           }
           $.ui.invalidate("ui.render");
         },
@@ -302,10 +363,11 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
   });
 
   on("ui.render", { component: "AbovePrompt" }, async ($, e, next) => {
+    if (headless) return next(e);
     if (e.props.hasSurvey) return next(e);
 
     const viewportColumns = (e.viewport as { columns?: number } | undefined)?.columns;
-    const props = await buildBandProps(active, $, e.props.maxRows as number, viewportColumns, "inline");
+    const props = await buildBandProps(active, $, e.props.maxRows as number, viewportColumns, "inline", liveKey);
 
     const { Client } = $.ui.resolve(e);
     return <Client key="band" module="./band.tsx" props={props} />;
@@ -319,19 +381,21 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
   // here (a Pane isn't sharing rows with the transcript the way AbovePrompt
   // shares them with the prompt), so this uses the same `BAND_ROWS_MAX`
   // ceiling `command.run` already uses when it has no live viewport either.
-  on("ui.render", { component: "Pane" }, async ($, e) => {
+  on("ui.render", { component: "Pane" }, async ($, e, next) => {
+    if (headless) return next(e);
     const viewportColumns = (e.viewport as { columns?: number } | undefined)?.columns;
     // Ticket 24: `Pane.placement` (claude-code.d.ts, 2.1.274) — `"dock"` on
     // a wide-enough terminal, `"inline"` when the engine floats it above
     // the prompt instead; drives the placement-derived style default.
     const placement = ((e.props as { placement?: "dock" | "inline" } | undefined)?.placement ?? "dock") as "dock" | "inline";
-    const props = await buildBandProps(active, $, BAND_ROWS_MAX, viewportColumns, placement);
+    const props = await buildBandProps(active, $, BAND_ROWS_MAX, viewportColumns, placement, liveKey);
 
     const { Client } = $.ui.resolve(e);
     return <Client key="band" module="./band.tsx" props={props} />;
   });
 
   on("ui.message", async ($, e, next) => {
+    if (headless) return next(e);
     const data = (e as { data?: unknown }).data;
     const idx = byId();
     if (isToggle(data) && idx.has(data.id)) {
@@ -368,24 +432,25 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
       }
     } else if (isClearMessage(data) && data.id === "agents") {
       // Ticket 24: the `[x]` button — same filter as `/telltale agents clear`.
-      const cells = ((await $.store.get("agents.cells")) as Cells | undefined) ?? {};
-      await $.store.set("agents.cells", clearDismissable(cells));
+      const cells = ((await $.store.get(liveKey("agents.cells"))) as Cells | undefined) ?? {};
+      await $.store.set(liveKey("agents.cells"), clearDismissable(cells));
       $.ui.invalidate("ui.render");
     } else if (isRowMessage(data) && data.id === "agents") {
       // Ticket 17 (SDD §2.6 "onRow"): a cell click, dispatched to the
       // agents panel's own pure `onRow` — this hook only reads/writes the
       // store keys it touches.
-      const cells = ((await $.store.get("agents.cells")) as Cells | undefined) ?? {};
+      const cells = ((await $.store.get(liveKey("agents.cells"))) as Cells | undefined) ?? {};
       const now = await $.clock.now();
       const { cells: updated, expanded } = onRow(data.hit, cells, now);
-      await $.store.set("agents.cells", updated);
-      await $.store.set("agents.expanded", expanded);
+      await $.store.set(liveKey("agents.cells"), updated);
+      await $.store.set(liveKey("agents.expanded"), expanded);
       $.ui.invalidate("ui.render");
     }
     return next(e);
   });
 
   on("command.run", { command: "telltale" }, async ($, e) => {
+    if (headless) return { text: "telltale: idle (headless session)" };
     const panelsState = ((await $.store.get("panels")) as Record<string, boolean> | undefined) ?? {};
     const wants = active
       .filter((p) => panelsState[p.id] ?? p.defaultOn)
@@ -395,7 +460,7 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
     // terminal size it doesn't have. Ticket 23: same error flag as
     // `buildBandProps` so this reports the same row budget the real render
     // would use.
-    const errorStatus = await anyPanelErroring(active, $);
+    const errorStatus = await anyPanelErroring(active, $, liveKey);
     const { slots, dropped, total } = layout(wants, BAND_ROWS_MAX, { status: errorStatus });
     const sizes: Record<string, Stage> = Object.fromEntries(
       await Promise.all(
@@ -417,7 +482,7 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
           style: ((await $.store.get("style.agents")) as AgentsView["style"] | undefined) ?? "auto",
           edge: ((await $.store.get("edge.agents")) as AgentsView["edge"] | undefined) ?? "right",
           size: ((await $.store.get("size.agents")) as AgentsView["size"] | undefined) ?? agentsPanel.defaultStage ?? "compact",
-          cells: ((await $.store.get("agents.cells")) as Cells | undefined) ?? {},
+          cells: ((await $.store.get(liveKey("agents.cells"))) as Cells | undefined) ?? {},
         }
       : undefined;
 
@@ -447,8 +512,12 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
       changed = true;
     }
     if (result.writes) {
+      // command.ts is pure and knows nothing of sessions, so `agents clear`'s
+      // write-back names the bare `agents.cells` key (agents-command.test.ts:
+      // "writes agents.cells") — this is the one place that translates it to
+      // this session's own key before it actually reaches the store.
       for (const [key, value] of Object.entries(result.writes)) {
-        await $.store.set(key, value);
+        await $.store.set(key === "agents.cells" ? liveKey("agents.cells") : key, value);
       }
       changed = true;
     }
@@ -462,9 +531,10 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
   // (except Spinner, which never invalidates) invalidates the render.
 
   on("turn.start", async ($, e, next) => {
+    if (headless) return next(e);
     const input = e as { turnId: string; text: string };
-    const cells = ((await $.store.get("agents.cells")) as Cells | undefined) ?? {};
-    await $.store.set("agents.cells", applyTurnStart(cells, input, await $.clock.now()));
+    const cells = ((await $.store.get(liveKey("agents.cells"))) as Cells | undefined) ?? {};
+    await $.store.set(liveKey("agents.cells"), applyTurnStart(cells, input, await $.clock.now()));
     $.ui.invalidate("ui.render");
     return next(e);
   });
@@ -476,40 +546,43 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
   // response once the stream ends, so it plays the same role the ticket's
   // "await next(e) first, use the result" plan does for a non-streaming hook.
   on("turn.step", async function* ($, e, next) {
+    if (headless) return yield* next(e);
     // Type pitfall (see 12-觀察hooks.md): `toolUses` lives on next(e)'s
     // RESULT, not on the input `e` — so next(e) is drained first.
     const result = yield* next(e);
     const input = e as { turnId: string; agentId?: string };
     const stepResult = result as { toolUses: readonly { name: string; input: unknown }[] };
-    const cells = ((await $.store.get("agents.cells")) as Cells | undefined) ?? {};
+    const cells = ((await $.store.get(liveKey("agents.cells"))) as Cells | undefined) ?? {};
     const { cells: updated, pending } = applyTurnStep(
       cells,
       { turnId: input.turnId, agentId: input.agentId, toolUses: stepResult.toolUses },
       await $.clock.now(),
     );
-    await $.store.set("agents.cells", updated);
+    await $.store.set(liveKey("agents.cells"), updated);
     pendingSpawns.push(...pending);
     $.ui.invalidate("ui.render");
     return result;
   });
 
   on("turn.complete", async ($, e, next) => {
+    if (headless) return next(e);
     const input = e as { turnId: string; agentId?: string };
-    const cells = ((await $.store.get("agents.cells")) as Cells | undefined) ?? {};
-    await $.store.set("agents.cells", applyTurnComplete(cells, input, await $.clock.now()));
+    const cells = ((await $.store.get(liveKey("agents.cells"))) as Cells | undefined) ?? {};
+    await $.store.set(liveKey("agents.cells"), applyTurnComplete(cells, input, await $.clock.now()));
     $.ui.invalidate("ui.render");
     return next(e);
   });
 
   on("ui.render", { component: "Spinner" }, async ($, e, next) => {
+    if (headless) return next(e);
     const input = e as { requestId: string; props: { mode: string } };
-    const cells = ((await $.store.get("agents.cells")) as Cells | undefined) ?? {};
+    const cells = ((await $.store.get(liveKey("agents.cells"))) as Cells | undefined) ?? {};
     const updated = applySpinner(
       cells,
       { requestId: input.requestId, mode: input.props.mode },
       await $.clock.now(),
     );
-    await $.store.set("agents.cells", updated);
+    await $.store.set(liveKey("agents.cells"), updated);
     // Spinner is the one hook here that never invalidates (DESIGN's breathe/
     // marquee redraw on their own clocks; a spinner tick alone isn't news).
     return next(e);
@@ -518,9 +591,10 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
   // Type pitfall 2 (see 12-觀察hooks.md): the matcher's `origin` is an
   // object `{ kind }`, not a bare string.
   on("session.receive", { origin: { kind: "task-notification" } }, async ($, e, next) => {
+    if (headless) return next(e);
     const input = e as { text: string };
-    const cells = ((await $.store.get("agents.cells")) as Cells | undefined) ?? {};
-    await $.store.set("agents.cells", applyTaskNotification(cells, input.text, await $.clock.now()));
+    const cells = ((await $.store.get(liveKey("agents.cells"))) as Cells | undefined) ?? {};
+    await $.store.set(liveKey("agents.cells"), applyTaskNotification(cells, input.text, await $.clock.now()));
     $.ui.invalidate("ui.render");
     // What this (or a downstream) hook returns and what next(e) resolves to
     // is the delivery's `{ text }`; pass a rewrite down, keep an unchanged one.

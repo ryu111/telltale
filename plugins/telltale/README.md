@@ -64,7 +64,7 @@ Pasted verbatim from `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin validate
 
 ```text
 register.tsx hooks: session.start, ui.render{component=AbovePrompt}, ui.render{component=Pane}, ui.message, command.run{command=telltale}, turn.start, turn.step, turn.complete, ui.render{component=Spinner}, session.receive{origin has {kind=task-notification}}
-register.tsx calls: $.agent.list, $.clock.every, $.clock.now, $.command.register, $.env.get, $.store.get, $.store.set, $.ui.invalidate, $.ui.open, $.ui.resolve
+register.tsx calls: $.agent.list, $.clock.every, $.clock.now, $.command.register, $.env.get, $.session.id, $.store.delete, $.store.get, $.store.keys, $.store.set, $.ui.invalidate, $.ui.open, $.ui.resolve
 ```
 
 ## The `agents` panel
@@ -129,6 +129,13 @@ when the row is too narrow.
 `open`/`close` control whether the `Pane` surface is visible at all, so
 telltale has to call `open` once for the Pane to render anything — it isn't
 telltale reaching out to move data anywhere.
+
+**Why `$.session.id`/`$.store.keys`/`$.store.delete` show up too.**
+`$.session.id` is read once so each session keeps its own cells (the store
+file is shared by every session of the same plugin); `$.store.keys`/`delete`
+only ever touch telltale's own `agents.*` keys, to drop cells left by
+sessions that ended more than a day ago. Headless sessions (`-p`, the SDK,
+Claude Desktop) leave the store alone entirely.
 
 ## Design tradeoffs
 

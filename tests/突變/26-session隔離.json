@@ -1,0 +1,20 @@
+[
+  {
+    "label": "headless session still runs",
+    "file": "plugins/telltale/hooks/register.tsx",
+    "old": "    const isInteractive = (e as { isInteractive?: boolean }).isInteractive;\n    headless = isInteractive === false;",
+    "new": "    const isInteractive = (e as { isInteractive?: boolean }).isInteractive;\n    headless = false;"
+  },
+  {
+    "label": "agents tick success does not clear the error",
+    "file": "plugins/telltale/hooks/register.tsx",
+    "old": "              await $.store.set(liveKey(\"agents.cells\"), data);\n              await $.store.set(liveKey(\"error.agents\"), \"\");",
+    "new": "              await $.store.set(liveKey(\"agents.cells\"), data);"
+  },
+  {
+    "label": "cells not keyed by session",
+    "file": "plugins/telltale/hooks/register.tsx",
+    "old": "  const liveKey = (base: string): string => `${base}.${sid}`;",
+    "new": "  const liveKey = (base: string): string => base;"
+  }
+]
