@@ -439,11 +439,11 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
 
     // Ticket 27 (SDD §2.8 "換邊三態"): no `agents` panel means no Pane was
     // ever opened, so this site behaves as `bottom` always did — draws
-    // everything. With `agents` live, an explicit value wins outright;
-    // auto/unset (ticket 29 "換邊 auto 退路") draws everything here until the
-    // Pane's own `ui.render` has actually reached this session (`paneSeen`),
-    // then yields — the real-machine fallback for a host that opens the
-    // Pane but never renders it.
+    // everything. With `agents` live, only `bottom`/`both` win outright;
+    // auto/unset/right (ticket 29 "換邊 auto 退路", ticket 30 "right 也走退路")
+    // all draw everything here until the Pane's own `ui.render` has actually
+    // reached this session (`paneSeen`), then yield — the real-machine
+    // fallback for a host that opens the Pane but never renders it.
     const hasAgents = active.some((p) => p.id === "agents");
     const stored = hasAgents ? ((await $.store.get("edge.agents")) as "auto" | "right" | "bottom" | "both" | undefined) : "bottom";
     const edge = effectiveEdge(stored, paneSeen);
@@ -471,9 +471,9 @@ const registerHooks = (panels: readonly Panel[], on: On, options: PluginOptions)
     if (headless) return next(e);
     // Ticket 27: an explicit `bottom` is the one stored value with no Pane
     // to draw into (session.start never opened it), so this site yields.
-    // Ticket 29: any other stored value (including auto/unset) means the
-    // Pane really is rendering right now — mark `paneSeen` below so the
-    // AbovePrompt fallback can yield to it from here on.
+    // Ticket 29 / 30: any other stored value (including auto/unset/right)
+    // means the Pane really is rendering right now — mark `paneSeen` below
+    // so the AbovePrompt fallback can yield to it from here on.
     const hasAgents = active.some((p) => p.id === "agents");
     const stored = hasAgents ? ((await $.store.get("edge.agents")) as "auto" | "right" | "bottom" | "both" | undefined) : "right";
     if (stored === "bottom") return next(e);

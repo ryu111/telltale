@@ -10,11 +10,5 @@
     "file": "plugins/telltale/hooks/register.tsx",
     "old": "      paneSeen = true;",
     "new": "      paneSeen = false;"
-  },
-  {
-    "label": "explicit right also falls back",
-    "file": "plugins/telltale/hooks/command.ts",
-    "old": "  if (stored === \"right\" || stored === \"bottom\" || stored === \"both\") return stored;",
-    "new": "  if (stored === \"bottom\" || stored === \"both\") return stored;"
   }
 ]

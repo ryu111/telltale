@@ -95,9 +95,10 @@ engine for a `Pane`, but keeps drawing the whole band above the prompt until
 that `Pane`'s own `ui.render` actually reaches it (some hosts open the
 surface and then never render it, cmux included); the first time it does,
 telltale yields above the prompt and everything moves into the `Pane` from
-then on. Set `right` explicitly to force `Pane`-only up front (nothing shows
-if that host never renders the `Pane` either — that's a choice you made, not
-a fallback). The v0.2 design draft sketched all four screen edges; `top`/
+then on. `right` and `auto` differ only in whether the value is stored —
+both fall back above the prompt until the `Pane` renders; the only way to
+have no band is `bottom` on a host with no AbovePrompt, or turning the panel
+off. The v0.2 design draft sketched all four screen edges; `top`/
 `left` are not positions the engine offers, so those answer `not available
 in this build` — that's an engine limitation, not telltale giving up on the
 idea.
