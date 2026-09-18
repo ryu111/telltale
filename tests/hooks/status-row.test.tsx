@@ -75,9 +75,11 @@ test("agents alone at 9 rows: no status row, agents gets 7 content rows", async 
 });
 
 test("a panel error brings the status row back: agents loses one row to it", async () => {
-  const eng = fakeEngine({ agents: [], store: { "error.agents.s1": "data too large" } });
+  const eng = fakeEngine({ agents: [] });
   register(eng.on, {});
   await eng.fire("session.start", {});
+  // Ticket 26: session.start runs the first (successful) tick, which clears the error — seed it afterwards.
+  eng.store["error.agents.s1"] = "data too large";
   const p = await render(eng, BAND_ROWS_MAX);
   expect(p.status).toBe(true);
   expect(p.panels.find((x) => x.id === "agents")?.error).toBe("data too large");

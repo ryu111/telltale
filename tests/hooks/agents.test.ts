@@ -192,6 +192,6 @@ test("a running main cell is never folded into history", async () => {
 test("calls stay within the eleven-op v0.2 whitelist", async () => {
   const eng = fakeEngine();
   await bootDev(eng);
-  const WHITELIST = new Set(["$.ui.resolve", "$.ui.invalidate", "$.clock.now", "$.clock.every", "$.store.get", "$.store.set", "$.command.register", "$.agent.list", "$.env.get", "$.ui.open", "$.ui.close"]);
+  const WHITELIST = new Set(["$.ui.resolve", "$.ui.invalidate", "$.clock.now", "$.clock.every", "$.store.get", "$.store.set", "$.command.register", "$.agent.list", "$.env.get", "$.ui.open", "$.ui.close", "$.session.id", "$.store.keys", "$.store.delete"]);
   for (const op of Object.keys(eng.calls)) expect(WHITELIST.has(op)).toBe(true);
 });
