@@ -68,7 +68,7 @@ export type FakeDollar = {
     resolve: (e?: unknown) => typeof ELEMENTS;
     invalidate: (scope?: string) => void;
     open: (args: Record<string, unknown>) => void;
-    close: (id: string) => void;
+    close: (args: Record<string, unknown> | string) => void;
   };
   clock: {
     now: () => number;
@@ -77,6 +77,13 @@ export type FakeDollar = {
   store: {
     get: (key: string) => Promise<unknown>;
     set: (key: string, value: unknown) => Promise<void>;
+    // Ticket 26: session-keyed live data needs to enumerate and drop stale keys.
+    delete: (key: string) => Promise<void>;
+    keys: () => Promise<string[]>;
+  };
+  // Ticket 26: `$.session.id()` — the transcript file's name; stable across resume.
+  session: {
+    id: () => Promise<string>;
   };
   command: {
     register: (spec: { name: string; description?: string; argumentHint?: string }) => Promise<{ command: string }>;
@@ -95,6 +102,8 @@ export type FakeEngineOpts = {
   options?: Record<string, unknown>;
   env?: Record<string, string>;
   agents?: FakeAgentInfo[];
+  // Ticket 26: what `$.session.id()` returns (default "s1").
+  sessionId?: string;
 };
 
 export type FakeEngine = {
@@ -154,9 +163,13 @@ export const fakeEngine = (opts: FakeEngineOpts = {}): FakeEngine => {
         const id = (args as { id?: unknown }).id;
         opened.push(typeof id === "string" ? id : JSON.stringify(args));
       },
-      close: (id) => {
+      close: (args) => {
         bump("$.ui.close");
-        opened.splice(opened.indexOf(id), 1);
+        // The real call takes `{ id }` (claude-code.d.ts PaneCloseArgs); an id
+        // that is not open is left alone, like the engine does.
+        const id = typeof args === "string" ? args : (args as { id?: unknown }).id;
+        const at = opened.indexOf(String(id));
+        if (at >= 0) opened.splice(at, 1);
       },
     },
     clock: {
@@ -179,6 +192,20 @@ export const fakeEngine = (opts: FakeEngineOpts = {}): FakeEngine => {
       set: async (key, value) => {
         bump("$.store.set");
         store[key] = roundTrip(value);
+      },
+      delete: async (key) => {
+        bump("$.store.delete");
+        delete store[key];
+      },
+      keys: async () => {
+        bump("$.store.keys");
+        return Object.keys(store);
+      },
+    },
+    session: {
+      id: async () => {
+        bump("$.session.id");
+        return opts.sessionId ?? "s1";
       },
     },
     command: {
