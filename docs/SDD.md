@@ -233,7 +233,7 @@ v0.2 追加的鍵（仍是完備表；每鍵 < 64 KiB，I5 同樣適用）：
 | `size.<id>` | `"summary" \| "compact" \| "full"` | stage 訊息、`/telltale <id> size` |
 | `agents.cells.<sid>`（v0.2b 前是 `agents.cells`） | `{ [cellId]: Cell }`（§2.6 的形狀；main 的 cellId = turnId、sub = agentId、bg = `${startAt}-${description}`）；completed 60 s 後刪、failed／孤兒留到 dismissed。**`<sid>` = `$.session.id()`，一個 session 只讀寫自己的**（§2.8） | poll 與各觀察型 hook |
 | `style.agents` | `"auto" \| "v1" \| "v2" \| "v4"`（沒存過視同 `auto`） | `/telltale agents style`、標題列按鍵 |
-| `edge.agents` | `"right" \| "bottom" \| "both"`（沒存過視同 `right`；引擎沒有的 top／left 不收） | `/telltale agents edge`、標題列按鍵 |
+| `edge.agents` | `"auto" \| "right" \| "bottom" \| "both"`（沒存＝auto；right 與 auto 只差有沒有明存，票 30；引擎沒有的 top／left 不收） | `/telltale agents edge`、標題列按鍵 |
 | `agents.expanded.<sid>` | `{ id, at } \| null`（完成的 cell 被點開，10 s 後 Client 視為 null） | row 訊息 |
 | `error.agents.<sid>` | 同 `error.<id>`，但 agents 的按 session 分（§2.8） | agents 的 tick |
 | `agents.hinted` | `true`（首次啟用提示已顯示） | 第一次 render |
@@ -311,7 +311,7 @@ subagent 迴圈的 `turn.step` 是否帶 `agentId` 送進來 → 票 16 實測�
 - agents 的 tick 成功時**要**寫 `error.agents.<sid> = ""`（舊碼只在 catch 寫、成功不清，一次失敗就永遠顯示）。
 - `calls:` 因此多 `$.session.id`、`$.store.keys`、`$.store.delete`（I12 更新；README 貼新輸出並解釋）。
 
-**換邊 auto 退路（票 29；2026-09-18 真機：cmux 裡 Pane 根本不畫，`right` 讓整條帶子消失，使用者裁定「沒存時自動退回上方」）**：`edge.agents` 沒存或 `"auto"` ＝ 想要 `right`，但 **Pane 的 `ui.render` 還沒來過就先由 AbovePrompt 畫全部面板**（module 變數 `paneSeen`，Pane hook 一畫就設 true 並 `invalidate`，之後 AbovePrompt 讓位）。明存 `right` 才強制只 Pane（Pane 不畫就什麼都沒有，那是使用者選的）。`/telltale agents edge` 沒存回 `agents edge: auto`；`agents edge auto` 可寫回。`buttons.edge` 是**生效值**（auto 時 `paneSeen ? "right" : "bottom"`）。
+**換邊 auto 退路（票 29；2026-09-18 真機：cmux 裡 Pane 根本不畫，`right` 讓整條帶子消失，使用者裁定「沒存時自動退回上方」）**：`edge.agents` 沒存或 `"auto"` ＝ 想要 `right`，但 **Pane 的 `ui.render` 還沒來過就先由 AbovePrompt 畫全部面板**（module 變數 `paneSeen`，Pane hook 一畫就設 true 並 `invalidate`，之後 AbovePrompt 讓位）。**票 30（2026-09-18 真機：cmux 上點 `R` 帶子消失、按鍵也跟著沒了，使用者裁定「R 也走退路」）：明存 `right` 一樣走這條退路**——`effectiveEdge` 只對 `bottom`、`both` 原樣回，其餘（`right`、`auto`、沒存）都是 `paneSeen ? "right" : "bottom"`；`right` 與 `auto` 只差「有沒有明存」（回報字串、`session.start` 都 open）。`/telltale agents edge` 沒存回 `agents edge: auto`；`agents edge auto` 可寫回。`buttons.edge` 是**生效值**（auto 時 `paneSeen ? "right" : "bottom"`）。
 
 **換邊三態（票 27）**：`edge.agents ∈ { right, bottom, both }`，沒存視同 `right`（票 29 起：沒存＝auto，見上）。`right`：`session.start` `$.ui.open` Pane，`ui.render{AbovePrompt}` 直接 `return next(e)`（只畫 Pane；窄終端時引擎自己把 Pane 落到輸入框上方）。`bottom`：不 open（已開就 `$.ui.close({ id: "telltale" })`），全部面板由 AbovePrompt 畫，`ui.render{Pane}` 回 `next(e)`。`both`：Pane 只畫 `agents`，AbovePrompt 畫其餘面板（沒有其餘就 `next(e)`）。切換（指令或按鍵）時：寫鍵 → 依新值 open／close → invalidate。top／left 仍回 `not available in this build`。README「引擎只給右側 dock 與輸入框上方兩個位置」那句改成三態說明。
 
