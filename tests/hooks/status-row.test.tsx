@@ -65,7 +65,7 @@ const render = async (eng: ReturnType<typeof fakeEngine>, maxRows: number) =>
   clientOf(await eng.fire("ui.render", { surface: "terminal", component: "AbovePrompt", viewport: { columns: 120 }, props: { hasSurvey: false, maxRows } }))!.props.props as Props;
 
 test("agents alone at 9 rows: no status row, agents gets 7 content rows", async () => {
-  const eng = fakeEngine({ agents: [] });
+  const eng = fakeEngine({ agents: [], store: { "edge.agents": "bottom" } }); // ticket 27: AbovePrompt draws only when edge is bottom
   register(eng.on, {});
   await eng.fire("session.start", {});
   const p = await render(eng, BAND_ROWS_MAX);
@@ -75,7 +75,7 @@ test("agents alone at 9 rows: no status row, agents gets 7 content rows", async 
 });
 
 test("a panel error brings the status row back: agents loses one row to it", async () => {
-  const eng = fakeEngine({ agents: [] });
+  const eng = fakeEngine({ agents: [], store: { "edge.agents": "bottom" } }); // ticket 27: AbovePrompt draws only when edge is bottom
   register(eng.on, {});
   await eng.fire("session.start", {});
   // Ticket 26: session.start runs the first (successful) tick, which clears the error — seed it afterwards.
@@ -87,7 +87,7 @@ test("a panel error brings the status row back: agents loses one row to it", asy
 });
 
 test("too short for agents (full needs 1 + 3): dropped, status row on", async () => {
-  const eng = fakeEngine({ agents: [] });
+  const eng = fakeEngine({ agents: [], store: { "edge.agents": "bottom" } }); // ticket 27: AbovePrompt draws only when edge is bottom
   register(eng.on, {});
   await eng.fire("session.start", {});
   const p = await render(eng, 4);

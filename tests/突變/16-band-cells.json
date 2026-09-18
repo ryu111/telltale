@@ -2,7 +2,7 @@
   {
     "label": "pane: session.start never opens it",
     "file": "plugins/telltale/hooks/register.tsx",
-    "old": "await $.ui.open({ id: \"telltale\", title: \"telltale\" });",
-    "new": "void 0;"
+    "old": "      if (edge !== \"bottom\") {\n        await $.ui.open({ id: \"telltale\", title: \"telltale\" });\n      }",
+    "new": "      if (edge !== \"bottom\") {\n        void 0;\n      }"
   }
 ]
