@@ -96,7 +96,7 @@ const cell = (id: string, status: Cell["status"]): Cell => ({
 });
 
 const boot = async (store: Record<string, unknown> = {}, panels = [agents]) => {
-  const eng = fakeEngine({ store: { panels: { agents: true }, ...store } });
+  const eng = fakeEngine({ store: { panels: { agents: true }, "edge.agents": "bottom", ...store } }); // ticket 27: AbovePrompt draws only when edge is bottom
   const reg = makeRegister(panels);
   reg(eng.on, {});
   await eng.fire("session.start", {});
@@ -159,7 +159,8 @@ test("default style follows placement: AbovePrompt/inline -> v1, docked Pane -> 
   const eng = await boot();
   const above = agentsOf(await renderAbove(eng));
   expect(above.style).toBe("v1");
-  expect(above.buttons).toEqual({ style: "v1", size: "full", edge: "right" });
+  expect(above.buttons).toEqual({ style: "v1", size: "full", edge: "bottom" });
+  eng.store["edge.agents"] = "right"; // ticket 27: the Pane draws only for right/both
   const docked = agentsOf(await renderPane(eng, "dock"));
   expect(docked.style).toBe("v2");
   expect(docked.buttons!.style).toBe("v2");
@@ -169,8 +170,9 @@ test("default style follows placement: AbovePrompt/inline -> v1, docked Pane -> 
 
 test("a stored style wins over placement; a stored 'auto' means placement again", async () => {
   const eng = await boot({ "style.agents": "v4" });
-  expect(agentsOf(await renderPane(eng, "dock")).style).toBe("v4");
   expect(agentsOf(await renderAbove(eng)).style).toBe("v4");
+  eng.store["edge.agents"] = "right"; // ticket 27: the Pane draws only for right/both
+  expect(agentsOf(await renderPane(eng, "dock")).style).toBe("v4");
   eng.store["style.agents"] = "auto";
   expect(agentsOf(await renderPane(eng, "dock")).style).toBe("v2");
 });
