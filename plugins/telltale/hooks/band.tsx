@@ -10,7 +10,7 @@ import type { BandPanel, BandProps } from "./hit";
 import { MIN_COLUMNS } from "./layout";
 import type { Tone } from "./panel";
 import { displayWidth, fit } from "./width";
-import { renderCell, TRANSIT_MS, BIRTH_MS, type Cell, type CameraState, type Tone2 } from "./cells";
+import { renderCell, TRANSIT_MS, BIRTH_MS, type Cell, type CameraState, type Tone2, type Expanded } from "./cells";
 
 export type { BandPanel, BandProps };
 
@@ -29,10 +29,15 @@ export type BandState = {
 // list only once that lands; until then this is always `undefined` and the
 // branch below never fires. Read structurally rather than widening
 // `BandPanel` itself (out of this ticket's 可碰檔案 — `hit.ts` owns that type).
-type CellsPanel = { cells: Cell[]; style?: "v1" | "v2" | "v4" };
+// Ticket 31: `expanded` rides the same structural (not `hit.ts`-typed)
+// path as `cells`/`style` — the click state register.tsx read back from
+// `agents.expanded.<sid>` (SDD §2.8), `null` when nothing's expanded.
+type CellsPanel = { cells: Cell[]; style?: "v1" | "v2" | "v4"; expanded?: Expanded };
 const cellsOf = (panel: BandPanel): CellsPanel | undefined => {
   const withCells = panel as unknown as Partial<CellsPanel>;
-  return Array.isArray(withCells.cells) ? { cells: withCells.cells, style: withCells.style ?? "v1" } : undefined;
+  return Array.isArray(withCells.cells)
+    ? { cells: withCells.cells, style: withCells.style ?? "v1", expanded: withCells.expanded ?? null }
+    : undefined;
 };
 
 // Whether `cell` needs a fresh redraw every frame (80 ms) rather than just
@@ -180,7 +185,7 @@ const buildCellRows = (
     if (remaining <= 0) break;
     const cam = camState[cell.id] ?? { offset: 0 };
     const h = Math.min(remaining, cellsPanel.style === "v2" ? panelRows : cellsPanel.style === "v4" ? 2 : 4);
-    const { lines, cam: updatedCam } = renderCell(cell, cellsPanel.style ?? "v1", columns, h, now, frame, cam);
+    const { lines, cam: updatedCam } = renderCell(cell, cellsPanel.style ?? "v1", columns, h, now, frame, cam, cellsPanel.expanded ?? null);
     nextCam[cell.id] = updatedCam;
     for (const line of lines) {
       rows.push({ spans: line.spans.map((s) => ({ text: s.text, tone2: s.tone })) });

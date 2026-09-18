@@ -1,0 +1,26 @@
+[
+  {
+    "label": "user collapse ignored",
+    "file": "plugins/telltale/hooks/cells.ts",
+    "old": "  if (cell.collapsed === true) return true;",
+    "new": "  if (cell.collapsed === true) return false;"
+  },
+  {
+    "label": "expanded never reopens",
+    "file": "plugins/telltale/hooks/cells.ts",
+    "old": "  return !(expanded !== null && expanded.id === cell.id && now - expanded.at < EXPANDED_MS);",
+    "new": "  return true;"
+  },
+  {
+    "label": "main history expands to nothing",
+    "file": "plugins/telltale/hooks/cells.ts",
+    "old": "export const MAIN_HISTORY_EXPAND = 3;",
+    "new": "export const MAIN_HISTORY_EXPAND = 0;"
+  },
+  {
+    "label": "expanded not passed to the Client",
+    "file": "plugins/telltale/hooks/register.tsx",
+    "old": "{ cells: view.cells, style, expanded }",
+    "new": "{ cells: view.cells, style, expanded: null }"
+  }
+]
