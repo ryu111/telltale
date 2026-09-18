@@ -15,7 +15,7 @@ const boot = async (eng: ReturnType<typeof fakeEngine>) => {
 const stubVia = async (eng: ReturnType<typeof fakeEngine>, agentId: string) => {
   eng.setNextResult("turn.step", { turnId: "t-sub", index: 0, answer: "", toolUses: [{ name: "Bash", input: { command: "ls", description: "list" } }], stopReason: "tool_use", usage: null });
   await eng.fire("turn.step", { turnId: "t-sub", agentId, index: 0, model: "haiku", messageCount: 1 });
-  expect((eng.store["agents.cells"] as Cells)[agentId]?.desc).toBe("");
+  expect((eng.store["agents.cells.s1"] as Cells)[agentId]?.desc).toBe("");
 };
 
 test("stub (desc \"\") + AgentInfo(description \"\", completed) → the cell is gone, no ✓ 0s row", async () => {
@@ -25,7 +25,7 @@ test("stub (desc \"\") + AgentInfo(description \"\", completed) → the cell is 
   eng.now = 1500;
   eng.agents = [{ id: "x1", description: "", type: "Explore", status: "completed" }];
   await eng.tick("agents");
-  expect((eng.store["agents.cells"] as Cells).x1).toBeUndefined();
+  expect((eng.store["agents.cells.s1"] as Cells).x1).toBeUndefined();
 });
 
 test("stub + AgentInfo(description \"\", running) → the stub stays, still waiting for a description", async () => {
@@ -34,7 +34,7 @@ test("stub + AgentInfo(description \"\", running) → the stub stays, still wait
   await stubVia(eng, "x2");
   eng.agents = [{ id: "x2", description: "", type: "Explore", status: "running" }];
   await eng.tick("agents");
-  const cell = (eng.store["agents.cells"] as Cells).x2;
+  const cell = (eng.store["agents.cells.s1"] as Cells).x2;
   expect(cell?.status).toBe("running");
   expect(cell?.desc).toBe("");
 });
@@ -46,7 +46,7 @@ test("stub + AgentInfo(description \"count files\", completed) → desc filled i
   eng.now = 3000;
   eng.agents = [{ id: "x3", description: "count files", type: "Explore", status: "completed" }];
   await eng.tick("agents");
-  const cell = (eng.store["agents.cells"] as Cells).x3;
+  const cell = (eng.store["agents.cells.s1"] as Cells).x3;
   expect(cell?.desc).toBe("count files");
   expect(cell?.status).toBe("completed");
   expect(cell?.endAt).toBe(3000);

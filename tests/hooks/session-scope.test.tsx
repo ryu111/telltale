@@ -8,10 +8,10 @@ import { agents, MAIN_HISTORY_ID } from "../../plugins/telltale/hooks/panels/age
 import { renderCell, type Cell } from "../../plugins/telltale/hooks/cells";
 
 test("session.start drops cells left by a previous session", async () => {
-  const eng = fakeEngine({ store: { "agents.cells": { old: { id: "old", kind: "main", label: "main", desc: "stale", status: "completed", firstAt: 0, endAt: 1, updatedAt: 1, steps: [] } } } });
+  const eng = fakeEngine({ store: { "agents.cells.s1": { old: { id: "old", kind: "main", label: "main", desc: "stale", status: "completed", firstAt: 0, endAt: 1, updatedAt: 1, steps: [] } } } });
   register(eng.on, {});
   await eng.fire("session.start", {});
-  expect(eng.store["agents.cells"]).toEqual({});
+  expect(eng.store["agents.cells.s1"]).toEqual({});
 });
 
 test("descOfTurn: a tag with attributes is still a notification turn", () => {
@@ -20,11 +20,11 @@ test("descOfTurn: a tag with attributes is still a notification turn", () => {
 });
 
 test("poll: an AgentInfo without a description never opens a cell", async () => {
-  const eng = fakeEngine({ agents: [{ id: "a1", description: "", type: "Explore", status: "completed" }], store: { "agents.cells": {} } });
+  const eng = fakeEngine({ agents: [{ id: "a1", description: "", type: "Explore", status: "completed" }], store: { "agents.cells.s1": {} } });
   register(eng.on, {});
   await eng.fire("session.start", {});
   await eng.tick("agents");
-  const cells = eng.store["agents.cells"] as Record<string, Cell>;
+  const cells = eng.store["agents.cells.s1"] as Record<string, Cell>;
   expect(Object.values(cells).filter((c) => c.kind === "sub")).toEqual([]);
 });
 

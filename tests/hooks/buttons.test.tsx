@@ -150,9 +150,9 @@ test("ui.message size sets the stage directly (not a cycle); ignored on a panel 
 
 test("ui.message clear drops failed/killed/orphan cells, keeps the rest (same as /telltale agents clear)", async () => {
   const eng = await boot();
-  eng.store["agents.cells"] = { a: cell("a", "failed"), b: cell("b", "running"), c: cell("c", "orphan") };
+  eng.store["agents.cells.s1"] = { a: cell("a", "failed"), b: cell("b", "running"), c: cell("c", "orphan") };
   await eng.fire("ui.message", { data: { kind: "clear", id: "agents" } });
-  expect(Object.keys(eng.store["agents.cells"] as Record<string, Cell>)).toEqual(["b"]);
+  expect(Object.keys(eng.store["agents.cells.s1"] as Record<string, Cell>)).toEqual(["b"]);
 });
 
 test("default style follows placement: AbovePrompt/inline -> v1, docked Pane -> v2; buttons.style is the effective one", async () => {

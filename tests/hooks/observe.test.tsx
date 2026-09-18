@@ -138,7 +138,7 @@ test("turn.start writes agents.cells and calls next exactly once", async () => {
   let nextCalls = 0;
   const orig = eng.fire;
   await eng.fire("turn.start", { turnId: "t1", text: "hello" });
-  const cells = eng.store["agents.cells"] as Cells;
+  const cells = eng.store["agents.cells.s1"] as Cells;
   expect(cells.t1.kind).toBe("main");
   expect(eng.invalidations).toBeGreaterThan(0);
 });
@@ -150,7 +150,7 @@ test("turn.step reads toolUses off next(e)'s result and returns that same result
   eng.setNextResult("turn.step", { turnId: "t1", index: 0, answer: "", toolUses: [{ name: "Bash", input: { description: "make check" } }], stopReason: "tool_use", usage: null });
   const result = await eng.fire("turn.step", { turnId: "t1", index: 0, model: "sonnet", messageCount: 1 });
   expect(result).toEqual({ turnId: "t1", index: 0, answer: "", toolUses: [{ name: "Bash", input: { description: "make check" } }], stopReason: "tool_use", usage: null });
-  const cells = eng.store["agents.cells"] as Cells;
+  const cells = eng.store["agents.cells.s1"] as Cells;
   expect(cells.t1.steps.map((s) => s.name)).toEqual(["prompt", "Bash"]);
 });
 
@@ -159,7 +159,7 @@ test("turn.complete marks the main cell completed", async () => {
   await boot(eng);
   await eng.fire("turn.start", { turnId: "t1", text: "hello" });
   await eng.fire("turn.complete", { turnId: "t1", answer: "done", durationMs: 10, isAborted: false, reason: "answer" });
-  const cells = eng.store["agents.cells"] as Cells;
+  const cells = eng.store["agents.cells.s1"] as Cells;
   expect(cells.t1.status).toBe("completed");
 });
 
@@ -170,35 +170,35 @@ test("ui.render{Spinner} does not invalidate", async () => {
   const before = eng.invalidations;
   await eng.fire("ui.render", { surface: "terminal", component: "Spinner", requestId: "t1", props: { word: "x", message: null, mode: "thinking" } });
   expect(eng.invalidations).toBe(before);
-  const cells = eng.store["agents.cells"] as Cells;
+  const cells = eng.store["agents.cells.s1"] as Cells;
   expect(cells.t1.steps.map((s) => s.name)).toEqual(["prompt", "think"]);
 });
 
 test("session.receive{origin:{kind:'task-notification'}} closes the matching bg cell and returns { text }", async () => {
   const eng = fakeEngine();
   await boot(eng);
-  eng.store["agents.cells"] = {
+  eng.store["agents.cells.s1"] = {
     "0-build": { id: "0-build", kind: "bg", label: "bg", desc: "build", status: "running", firstAt: 0, updatedAt: 0, steps: [{ name: "prompt", t0: 0 }] },
   } satisfies Cells;
   const result = await eng.fire("session.receive", { origin: { kind: "task-notification" }, text: 'Background command "build" completed' });
   expect(result).toEqual({ text: 'Background command "build" completed' });
-  const cells = eng.store["agents.cells"] as Cells;
+  const cells = eng.store["agents.cells.s1"] as Cells;
   expect(cells["0-build"].status).toBe("completed");
 });
 
 test("session.receive with a different origin is left alone by this hook (no matcher hit)", async () => {
   const eng = fakeEngine();
   await boot(eng);
-  eng.store["agents.cells"] = {} satisfies Cells;
+  eng.store["agents.cells.s1"] = {} satisfies Cells;
   await eng.fire("session.receive", { origin: { kind: "bridge" }, text: "hi" });
-  expect(eng.store["agents.cells"]).toEqual({});
+  expect(eng.store["agents.cells.s1"]).toEqual({});
 });
 
 // ── 補題 (mutation #4 of ticket 12): the hook returns next's result, not a copy of the input (I13) ──
 test("session.receive: the hook returns what next(e) resolved, not input.text", async () => {
   const eng = fakeEngine();
   await boot(eng);
-  eng.store["agents.cells"] = {} satisfies Cells;
+  eng.store["agents.cells.s1"] = {} satisfies Cells;
   eng.setNextResult("session.receive", { text: "rewritten by a later plugin" });
   const result = await eng.fire("session.receive", { origin: { kind: "task-notification" }, text: 'Background command "x" completed' });
   expect(result).toEqual({ text: "rewritten by a later plugin" });

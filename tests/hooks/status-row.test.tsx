@@ -75,7 +75,7 @@ test("agents alone at 9 rows: no status row, agents gets 7 content rows", async 
 });
 
 test("a panel error brings the status row back: agents loses one row to it", async () => {
-  const eng = fakeEngine({ agents: [], store: { "error.agents": "data too large" } });
+  const eng = fakeEngine({ agents: [], store: { "error.agents.s1": "data too large" } });
   register(eng.on, {});
   await eng.fire("session.start", {});
   const p = await render(eng, BAND_ROWS_MAX);
